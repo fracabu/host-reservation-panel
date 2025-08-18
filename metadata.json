@@ -1,0 +1,5 @@
+{
+  "name": "Host Reservation Panel",
+  "description": "An application for hosts to view and analyze their booking reservations, calculating total nights, gross income, and net income from a list of bookings.",
+  "requestFramePermissions": []
+}
