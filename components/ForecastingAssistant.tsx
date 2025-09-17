@@ -4,15 +4,48 @@ import { Reservation, Status, Forecast, PricingAction } from '../types';
 
 interface ForecastingAssistantProps {
     reservations: Reservation[];
+    forecast: any;
+    isLoading: boolean;
+    error: string | null;
+    onSetForecast: (forecast: any) => void;
+    onSetLoading: (loading: boolean) => void;
+    onSetError: (error: string | null) => void;
 }
 
-const ForecastingAssistant: React.FC<ForecastingAssistantProps> = ({ reservations }) => {
+const ForecastingAssistant: React.FC<ForecastingAssistantProps> = ({
+    reservations,
+    forecast,
+    isLoading,
+    error,
+    onSetForecast,
+    onSetLoading,
+    onSetError
+}) => {
     const [location, setLocation] = useState('Roma');
     const [date, setDate] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM format
-    const [description, setDescription] = useState('Appartamento con una camera vicino al Vaticano');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [forecast, setForecast] = useState<Forecast | null>(null);
+    const [apartmentType, setApartmentType] = useState('');
+    const [customDescription, setCustomDescription] = useState('');
+
+    const apartmentTypes = [
+        { id: 'custom', name: 'Personalizzato', description: '' },
+        { id: 'studio', name: 'Monolocale/Studio', description: 'Monolocale moderno nel centro storico con angolo cottura e bagno' },
+        { id: 'one-bedroom', name: 'Appartamento 1 Camera', description: 'Appartamento con una camera da letto, soggiorno, cucina e bagno' },
+        { id: 'two-bedroom', name: 'Appartamento 2 Camere', description: 'Appartamento spazioso con due camere da letto, soggiorno, cucina attrezzata e bagno' },
+        { id: 'three-bedroom', name: 'Appartamento 3+ Camere', description: 'Grande appartamento familiare con tre o più camere da letto, ampio soggiorno e cucina' },
+        { id: 'loft', name: 'Loft/Attico', description: 'Loft di design o attico con terrazza, spazi aperti e finiture di pregio' },
+        { id: 'historic', name: 'Palazzo Storico', description: 'Appartamento in palazzo storico con affreschi, soffitti alti e dettagli d\'epoca' },
+        { id: 'luxury', name: 'Appartamento di Lusso', description: 'Appartamento di lusso con servizi premium, concierge e arredi di alta gamma' },
+        { id: 'budget', name: 'Soluzione Economica', description: 'Appartamento semplice e funzionale, ideale per viaggiatori attenti al budget' },
+        { id: 'business', name: 'Business Apartment', description: 'Appartamento business con Wi-Fi veloce, scrivania e zona lavoro attrezzata' }
+    ];
+
+    const getDescription = () => {
+        if (apartmentType === 'custom') {
+            return customDescription;
+        }
+        const selected = apartmentTypes.find(type => type.id === apartmentType);
+        return selected ? selected.description : customDescription;
+    };
 
     const getHistoricalSummary = (): string => {
         if (reservations.length === 0) {
@@ -42,13 +75,13 @@ const ForecastingAssistant: React.FC<ForecastingAssistantProps> = ({ reservation
     };
 
     const handleGenerateForecast = async () => {
-        if (!location || !date || !description) {
-            setError("Per favore, compila tutti i campi.");
+        if (!location || !date || (!apartmentType || (apartmentType === 'custom' && !customDescription))) {
+            onSetError("Per favore, compila tutti i campi.");
             return;
         }
-        setIsLoading(true);
-        setError(null);
-        setForecast(null);
+        onSetLoading(true);
+        onSetError(null);
+        onSetForecast(null);
 
         try {
             if (!process.env.API_KEY) throw new Error("API_KEY environment variable is not set.");
@@ -63,7 +96,8 @@ const ForecastingAssistant: React.FC<ForecastingAssistantProps> = ({ reservation
             **Dati di Input:**
             - **Località:** ${location}
             - **Mese/Anno:** ${monthName} ${year}
-            - **Descrizione Proprietà:** ${description}
+            - **Tipo Proprietà:** ${apartmentTypes.find(t => t.id === apartmentType)?.name || 'Personalizzato'}
+            - **Descrizione Proprietà:** ${getDescription()}
             - **Dati Storici di Performance (Baseline):**
               ${historicalData}
             
@@ -149,16 +183,16 @@ const ForecastingAssistant: React.FC<ForecastingAssistantProps> = ({ reservation
             }
 
             const parsedData: Omit<Forecast, 'groundingSources'> = JSON.parse(jsonText);
-            setForecast({
+            onSetForecast({
                 ...parsedData,
                 groundingSources: sources
             });
 
         } catch (e: any) {
             console.error(e);
-            setError(`Analisi fallita: ${e.message || 'Errore sconosciuto.'}`);
+            onSetError(`Analisi fallita: ${e.message || 'Errore sconosciuto.'}`);
         } finally {
-            setIsLoading(false);
+            onSetLoading(false);
         }
     };
 
@@ -184,10 +218,48 @@ const ForecastingAssistant: React.FC<ForecastingAssistantProps> = ({ reservation
                         <label htmlFor="date" className="block text-sm font-medium text-gray-700">Mese e Anno</label>
                         <input type="month" id="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
                     </div>
-                    <div className="md:col-span-3">
-                        <label htmlFor="description" className="block text-sm font-medium text-gray-700">Breve descrizione dell'alloggio</label>
-                        <input type="text" id="description" value={description} onChange={e => setDescription(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    <div>
+                        <label htmlFor="apartmentType" className="block text-sm font-medium text-gray-700">Tipo di Appartamento</label>
+                        <select
+                            id="apartmentType"
+                            value={apartmentType}
+                            onChange={e => setApartmentType(e.target.value)}
+                            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        >
+                            <option value="">Seleziona tipo...</option>
+                            {apartmentTypes.map(type => (
+                                <option key={type.id} value={type.id}>{type.name}</option>
+                            ))}
+                        </select>
                     </div>
+
+                    {/* Descrizione personalizzata quando selezionato "Personalizzato" */}
+                    {apartmentType === 'custom' && (
+                        <div className="md:col-span-3">
+                            <label htmlFor="customDescription" className="block text-sm font-medium text-gray-700">Descrizione Personalizzata</label>
+                            <textarea
+                                id="customDescription"
+                                value={customDescription}
+                                onChange={e => setCustomDescription(e.target.value)}
+                                rows={3}
+                                placeholder="Descrivi il tuo appartamento: numero di camere, caratteristiche, posizione, servizi..."
+                                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            />
+                        </div>
+                    )}
+
+                    {/* Anteprima descrizione per tipi predefiniti */}
+                    {apartmentType && apartmentType !== 'custom' && (
+                        <div className="md:col-span-3">
+                            <label className="block text-sm font-medium text-gray-700">Descrizione Automatica</label>
+                            <div className="mt-1 p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
+                                {getDescription()}
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">
+                                💡 Questa descrizione verrà utilizzata per l'analisi. Seleziona "Personalizzato" se vuoi modificarla.
+                            </p>
+                        </div>
+                    )}
                 </div>
                 <div className="mt-6">
                     <button onClick={handleGenerateForecast} disabled={isLoading} className="w-full md:w-auto px-6 py-3 text-base font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400">

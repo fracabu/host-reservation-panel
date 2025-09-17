@@ -8,10 +8,14 @@ Un'applicazione web per la gestione e analisi delle prenotazioni di host Airbnb 
 
 - **📄 Estrazione Dati Multi-formato**: Supporto per file CSV, immagini e PDF delle prenotazioni
 - **🤖 AI-Powered Processing**: Utilizzo di Google Gemini AI per l'estrazione automatica dei dati da immagini e documenti
-- **📊 Dashboard Analytics**: Visualizzazione completa delle statistiche di prenotazione
-- **📈 Previsioni e Strategie**: Assistente AI per previsioni di mercato e raccomandazioni sui prezzi
+- **📊 Dashboard Analytics**: Visualizzazione completa delle statistiche di prenotazione con grafici interattivi
+- **📈 Previsioni e Strategie**: Assistente AI per previsioni di mercato e raccomandazioni sui prezzi (con stato persistente)
 - **💰 Analisi Finanziaria**: Riepilogo mensile con calcoli di commissioni e guadagni netti
 - **🔄 Gestione Multi-piattaforma**: Supporto nativo per Airbnb e Booking.com
+- **📋 Report PDF Professionali**: Generazione automatica di report completi con previsioni integrate
+- **💬 AI Chat Assistant**: Assistente conversazionale per insights sui dati
+- **🎛️ Interfaccia Multi-Vista**: Navigazione tra Dashboard, Analytics, Prenotazioni e Forecasting
+- **📱 Design Responsivo**: Sidebar collassabile e interfaccia ottimizzata per tutti i dispositivi
 
 ## 🛠 Tecnologie
 
@@ -58,15 +62,22 @@ Un'applicazione web per la gestione e analisi delle prenotazioni di host Airbnb 
 ```
 host-reservation-panel/
 ├── components/           # Componenti React
-│   ├── Dashboard.tsx     # Dashboard principale
-│   ├── ForecastingAssistant.tsx  # Assistente previsioni
+│   ├── Dashboard.tsx     # Dashboard principale con overview
+│   ├── Analytics.tsx     # Grafici e analytics avanzate
+│   ├── ReservationsList.tsx  # Gestione prenotazioni con filtri
+│   ├── ForecastingAssistant.tsx  # Assistente previsioni (stato persistente)
+│   ├── Sidebar.tsx       # Navigazione laterale
+│   ├── AIChat.tsx        # Chat assistant AI
+│   ├── ComprehensiveReport.tsx  # Generazione report PDF
+│   ├── ChartsForPDF.tsx  # Grafici ottimizzati per PDF
 │   ├── FileUpload.tsx    # Upload file drag-and-drop
 │   ├── MonthlySummaryTable.tsx   # Tabella riepilogo mensile
 │   └── ...
 ├── services/
+│   ├── geminiService.ts  # Servizio AI per elaborazione
 │   └── data.ts          # Servizi per elaborazione dati
 ├── types.ts             # Definizioni TypeScript
-├── App.tsx              # Componente principale e logica di stato
+├── App.tsx              # Componente principale e gestione stato globale
 └── index.tsx            # Entry point dell'applicazione
 ```
 
@@ -83,17 +94,30 @@ host-reservation-panel/
 - ✅ Documenti PDF
 - ✅ Screenshot delle piattaforme di prenotazione
 
-### 3. Analisi Dati
+### 3. Navigazione Multi-Vista
+- **Dashboard**: Overview generale e caricamento file
+- **Analytics**: Grafici dettagliati e metriche avanzate
+- **Prenotazioni**: Lista completa con filtri e ordinamento
+- **Forecasting**: Previsioni AI e strategie di pricing
+
+### 4. Analisi Dati
 - Dashboard con statistiche in tempo reale
 - Riepilogo mensile per piattaforma
-- Calcolo automatico di commissioni e tasse
-- Esportazione PDF dei report
+- Calcolo automatico di commissioni e tasse (21%)
+- Gestione corretta di no-show e cancellazioni
+- Esportazione PDF dei report completi
 
-### 4. Previsioni AI
-- Analisi del mercato locale
+### 5. Previsioni AI (Stato Persistente)
+- Analisi del mercato locale con eventi identificati
 - Raccomandazioni sui prezzi per eventi speciali
 - Strategie di ottimizzazione dell'occupancy rate
-- Insights su domanda e offerta
+- Insights quantitativi su domanda e offerta
+- Generazione continua anche cambiando scheda
+
+### 6. AI Chat Assistant
+- Conversazioni naturali sui tuoi dati
+- Insights automatici e analisi personalizzate
+- Risposte basate sui dati reali delle prenotazioni
 
 ## 🔧 Comandi Disponibili
 

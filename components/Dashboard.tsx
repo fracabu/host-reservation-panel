@@ -3,6 +3,7 @@ import { Reservation, Status, MonthlyBreakdown, MonthlyStats, Platform } from '.
 import StatsCard from './StatsCard';
 import FileUpload from './FileUpload';
 import MonthlySummaryTable from './MonthlySummaryTable';
+import ComprehensiveReport from './ComprehensiveReport';
 
 interface DashboardProps {
   reservations: Reservation[];
@@ -10,9 +11,11 @@ interface DashboardProps {
   error: string | null;
   onProcessFiles: (files: FileList) => void;
   processingFileNames: string[];
+  retryCount?: number;
+  forecast?: any;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, onProcessFiles, processingFileNames }) => {
+const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, onProcessFiles, processingFileNames, retryCount = 0, forecast }) => {
   
   if (isLoading) {
     return (
@@ -60,6 +63,15 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
   }
   
   const activeReservations = reservations.filter(r => r.status === Status.OK || r.status === Status.NoShow);
+
+  // Debug: mostra breakdown degli status
+  const statusBreakdown = reservations.reduce((acc, r) => {
+    acc[r.status] = (acc[r.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  console.log('Status breakdown:', statusBreakdown);
+  console.log('Total reservations:', reservations.length);
+  console.log('Active reservations (OK + NoShow):', activeReservations.length);
 
   const calculateStats = (resList: Reservation[]): MonthlyStats => {
     const totalNights = resList.reduce((acc, res) => {
@@ -212,6 +224,18 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
 
 
       <div className="bg-white shadow rounded-lg">
+        <div className="p-4 sm:p-6 border-b border-gray-200 flex flex-wrap justify-between items-center gap-4">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">
+            Riepilogo e Export
+          </h3>
+          <div className="flex items-center space-x-3">
+            <ComprehensiveReport
+              reservations={reservations}
+              monthlyBreakdowns={monthlyBreakdowns}
+              forecast={forecast}
+            />
+          </div>
+        </div>
         <MonthlySummaryTable summaries={monthlyBreakdowns} />
       </div>
     </div>

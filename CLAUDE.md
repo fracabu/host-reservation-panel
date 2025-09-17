@@ -22,6 +22,8 @@ npm run build
 npm run preview
 ```
 
+**Note**: This project has minimal build scripts. No linting, testing, or type-checking commands are configured in package.json.
+
 ## Environment Setup
 
 The application requires a Gemini API key for AI processing:
@@ -51,8 +53,9 @@ The application requires a Gemini API key for AI processing:
 
 ### State Management
 - React hooks-based state in App.tsx
-- Key states: `reservations`, `isLoading`, `error`, `processingFileNames`
-- View switching between 'dashboard' and 'forecast' modes
+- Key states: `reservations`, `isLoading`, `error`, `processingFileNames`, `forecast`, `forecastLoading`, `forecastError`
+- View switching between 'dashboard', 'analytics', 'reservations', and 'forecast' modes
+- **Persistent Forecasting**: Forecast state is global, allowing tab switching without interrupting AI generation
 
 ## AI Integration
 
@@ -67,6 +70,7 @@ The application requires a Gemini API key for AI processing:
 - Date format conversion from DD/MM/YYYY to YYYY-MM-DD
 - Price parsing with Euro symbol and comma decimal handling
 - Guest description concatenation from separate adult/child/infant columns
+- **Status Mapping**: Correctly handles 'Mancata presentazione' (no-show) status from CSV files
 
 ## Development Notes
 
@@ -87,3 +91,49 @@ The application requires a Gemini API key for AI processing:
 - Error handling with user-friendly messages
 - Platform-specific data extraction and validation
 - Monthly financial analytics and forecasting
+- **Comprehensive PDF Reports**: Professional reports with analytics, charts, and forecast integration
+- **Sidebar Navigation**: Multi-view interface (Dashboard, Analytics, Reservations, Forecasting)
+- **AI Chat Assistant**: Interactive chat for data insights and analysis
+- **Advanced Forecasting**: Event-based pricing strategies with quantitative predictions
+
+## Component Structure
+
+The application follows a flat component structure in the `components/` directory:
+- **Dashboard.tsx**: Main dashboard with file upload and stats overview
+- **Analytics.tsx**: Advanced analytics with charts and visualizations
+- **ReservationsList.tsx**: Comprehensive reservation management with filtering and sorting
+- **ForecastingAssistant.tsx**: AI-powered forecasting and pricing recommendations (with persistent state)
+- **Sidebar.tsx**: Navigation sidebar with collapsible design
+- **AIChat.tsx**: Interactive AI assistant for data insights
+- **ComprehensiveReport.tsx**: Professional PDF report generation with forecasts
+- **ChartsForPDF.tsx**: Chart components optimized for PDF export
+- **MonthlySummaryTable.tsx**: Monthly financial breakdown table
+- **StatsCard.tsx**: Reusable statistics display cards
+- **StatusBadge.tsx**: Status indicator component
+- **FileUpload.tsx**: Drag-and-drop file upload interface
+
+All components are TypeScript React functional components using hooks for state management.
+
+## Recent Updates (2025)
+
+### Persistent Forecasting System
+- **Global State Management**: Forecast generation continues even when switching tabs
+- **Visual Indicators**: Header shows "Generando previsione..." during AI processing
+- **Auto-Resume**: Return to forecast tab to see completed results
+
+### Enhanced PDF Reports
+- **Professional Layout**: Improved margins, typography, and spacing
+- **Complete Forecast Integration**: All forecast sections included (events, pricing actions, recommendations)
+- **Financial Summary**: Comprehensive overview including net calculations and commission tracking
+- **Optimized Tables**: Fixed column widths to prevent content truncation
+
+### No-Show Status Handling
+- **CSV Parser Enhancement**: Correctly identifies and maps "Mancata presentazione" status
+- **Financial Inclusion**: No-shows are included in revenue calculations as intended
+- **Status Display**: Proper badge colors and filtering in reservation lists
+
+### Multi-View Interface
+- **Dashboard**: Overview and file processing
+- **Analytics**: Charts and advanced metrics
+- **Reservations**: Detailed reservation management
+- **Forecasting**: AI-powered pricing and demand analysis

@@ -47,10 +47,28 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
   
     const formatCurrencyForPDF = (value: number) => value.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' E';
   
+    // Calcola i totali generali
+    const grandTotals = summaries.reduce((acc, summary) => {
+      acc.activeBookings += summary.total.activeBookings;
+      acc.totalNights += summary.total.totalNights;
+      acc.totalGross += summary.total.totalGross;
+      acc.totalCommission += summary.total.totalCommission;
+      acc.totalNetPreTax += summary.total.totalNetPreTax;
+      acc.totalNetPostTax += summary.total.totalNetPostTax;
+      return acc;
+    }, {
+      activeBookings: 0,
+      totalNights: 0,
+      totalGross: 0,
+      totalCommission: 0,
+      totalNetPreTax: 0,
+      totalNetPostTax: 0
+    });
+
     summaries.forEach(summary => {
       // Month Header
-      tableBody.push([{ content: summary.monthYear, colSpan: 8, styles: { fontStyle: 'bold', fillColor: '#e5e7eb', textColor: '#1f2937' } }]);
-      
+      tableBody.push([{ content: summary.monthYear, colSpan: 7, styles: { fontStyle: 'bold', fillColor: '#e5e7eb', textColor: '#1f2937' } }]);
+
       // Platform Rows
       const platforms: Array<{ name: string, data: MonthlyStats }> = [
         { name: '  Booking.com', data: summary.booking },
@@ -68,7 +86,7 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
             formatCurrencyForPDF(p.data.totalNetPostTax)
         ]);
       });
-  
+
       // Total Mese row
       tableBody.push([
         { content: 'Totale Mese', styles: { fontStyle: 'bold', cellPadding: { left: 4 } } },
@@ -80,12 +98,30 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
         { content: formatCurrencyForPDF(summary.total.totalNetPostTax), styles: { fontStyle: 'bold' } }
       ]);
     });
+
+    // Aggiungi riga vuota e totali generali
+    if (summaries.length > 1) {
+      tableBody.push([
+        { content: '', colSpan: 7, styles: { fillColor: '#ffffff', minCellHeight: 8 } }
+      ]);
+
+      tableBody.push([
+        { content: 'TOTALI GENERALI', styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff', cellPadding: { left: 4 } } },
+        { content: grandTotals.activeBookings.toString(), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
+        { content: grandTotals.totalNights.toString(), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
+        { content: formatCurrencyForPDF(grandTotals.totalGross), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
+        { content: formatCurrencyForPDF(grandTotals.totalCommission), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff', textColor: '#ef4444' } },
+        { content: formatCurrencyForPDF(grandTotals.totalNetPreTax), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
+        { content: formatCurrencyForPDF(grandTotals.totalNetPostTax), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#22c55e' } }
+      ]);
+    }
   
     autoTable(doc, {
       head: [['Piattaforma', 'Prenot.', 'Notti', 'Lordo', 'Commissione', 'Netto (pre-tasse)', 'Netto Finale (21%)']],
       body: tableBody,
-      startY: 20,
+      startY: 35,
       theme: 'grid',
+      margin: { top: 35, left: 14, right: 14, bottom: 20 },
       headStyles: { fillColor: '#374151', textColor: '#ffffff', fontStyle: 'bold' },
       columnStyles: {
         0: { cellWidth: 45 },
@@ -101,13 +137,20 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
         }
       },
       didDrawPage: function (data) {
+        // Header - sempre nella stessa posizione su ogni pagina
         doc.setFontSize(18);
         doc.setTextColor(40);
-        doc.text('Riepilogo Mensile per Piattaforma', data.settings.margin.left, 15);
-        
+        doc.text('Riepilogo Mensile per Piattaforma', 14, 20);
+
+        // Footer - numero pagina
         const pageCount = doc.getNumberOfPages();
         doc.setFontSize(10);
-        doc.text(`Pagina ${data.pageNumber} di ${pageCount}`, data.settings.margin.left, doc.internal.pageSize.height - 10);
+        doc.setTextColor(100);
+        doc.text(`Pagina ${data.pageNumber} di ${pageCount}`, 14, doc.internal.pageSize.height - 10);
+
+        // Data generazione
+        const today = new Date().toLocaleDateString('it-IT');
+        doc.text(`Generato il ${today}`, doc.internal.pageSize.width - 60, doc.internal.pageSize.height - 10);
       }
     });
   
