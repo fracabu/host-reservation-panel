@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
+import ReactMarkdown from 'react-markdown';
 import { Reservation, MonthlyBreakdown, Forecast } from '../types';
 
 interface Message {
@@ -39,7 +40,7 @@ const AIChat: React.FC<AIChatProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-1.5-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -293,7 +294,7 @@ DOMANDA DELL'UTENTE: ${originalInput}
 
 Rispondi in modo specifico e utile basandoti sui dati forniti. Mantieni la risposta completa e dettagliata.`;
 
-      // Enhanced API configuration
+      // Enhanced API configuration with Google Search grounding
       const response = await Promise.race([
         ai.models.generateContent({
           model: selectedModel,
@@ -304,7 +305,12 @@ Rispondi in modo specifico e utile basandoti sui dati forniti. Mantieni la rispo
             topP: 0.8,
             topK: 40,
             stopSequences: [],
-          }
+          },
+          tools: [
+            {
+              googleSearch: {}
+            }
+          ]
         }),
         // Timeout after 30 seconds
         new Promise((_, reject) =>
@@ -495,13 +501,15 @@ Rispondi in modo specifico e utile basandoti sui dati forniti. Mantieni la rispo
                 className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                  className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
                     message.isUser
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-700 text-gray-100'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{message.text}</p>
+                  <div className="prose prose-sm max-w-none prose-invert">
+                    <ReactMarkdown>{message.text}</ReactMarkdown>
+                  </div>
                   <p className={`text-xs mt-1 ${
                     message.isUser ? 'text-indigo-200' : 'text-gray-400'
                   }`}>
