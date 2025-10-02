@@ -4,11 +4,12 @@ import Analytics from './components/Analytics';
 import ReservationsList from './components/ReservationsList';
 import Sidebar from './components/Sidebar';
 import AIChat from './components/AIChat';
+import Calendar from './components/Calendar';
 import { Reservation, Status, Platform } from './types';
 import { GeminiService } from './services/geminiService';
 import ForecastingAssistant from './components/ForecastingAssistant';
 
-type View = 'dashboard' | 'analytics' | 'reservations' | 'forecast';
+type View = 'dashboard' | 'analytics' | 'reservations' | 'forecast' | 'calendar';
 
 const App: React.FC = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -28,7 +29,7 @@ const App: React.FC = () => {
   // Calcola monthly breakdowns per la chat
   const monthlyBreakdowns = useMemo(() => {
     const activeReservations = reservations.filter(r => r.status === Status.OK || r.status === Status.NoShow);
-    const emptyStats = { activeBookings: 0, totalNights: 0, totalGross: 0, totalCommission: 0, totalNetPreTax: 0, totalNetPostTax: 0 };
+    const emptyStats = { activeBookings: 0, totalNights: 0, totalGross: 0, totalCommission: 0, totalNetPreTax: 0, totalCedolareSecca: 0, totalNetPostTax: 0 };
     const summaries: { [key: string]: any } = {};
 
     activeReservations.forEach(res => {
@@ -51,7 +52,9 @@ const App: React.FC = () => {
         const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
         const netPreTax = res.price - res.commission;
-        const netPostTax = netPreTax * 0.79;
+        // Calculate cedolare secca (21% tax on net income)
+        const cedolareSecca = netPreTax * 0.21;
+        const netPostTax = netPreTax - cedolareSecca;
 
         const platformKey = res.platform === 'Booking.com' ? 'booking' : 'airbnb';
 
@@ -60,6 +63,7 @@ const App: React.FC = () => {
         summaries[monthYearKey][platformKey].totalGross += res.price;
         summaries[monthYearKey][platformKey].totalCommission += res.commission;
         summaries[monthYearKey][platformKey].totalNetPreTax += netPreTax;
+        summaries[monthYearKey][platformKey].totalCedolareSecca += cedolareSecca;
         summaries[monthYearKey][platformKey].totalNetPostTax += netPostTax;
 
         summaries[monthYearKey].total.activeBookings += 1;
@@ -67,6 +71,7 @@ const App: React.FC = () => {
         summaries[monthYearKey].total.totalGross += res.price;
         summaries[monthYearKey].total.totalCommission += res.commission;
         summaries[monthYearKey].total.totalNetPreTax += netPreTax;
+        summaries[monthYearKey].total.totalCedolareSecca += cedolareSecca;
         summaries[monthYearKey].total.totalNetPostTax += netPostTax;
 
       } catch (e) {
@@ -92,19 +97,83 @@ const App: React.FC = () => {
   }, [reservations]);
 
 
+  const splitCSVIntoRows = (text: string): string[] => {
+    const rows: string[] = [];
+    let currentRow = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        currentRow += char;
+      } else if (char === '\n' && !inQuotes) {
+        if (currentRow.trim()) {
+          rows.push(currentRow);
+        }
+        currentRow = '';
+      } else {
+        currentRow += char;
+      }
+    }
+
+    if (currentRow.trim()) {
+      rows.push(currentRow);
+    }
+
+    return rows;
+  };
+
+  const parseCSVLine = (line: string, delimiter: string = ','): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === delimiter && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
   const parseAirbnbCSV = (file: File): Promise<Reservation[]> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
                 const text = event.target?.result as string;
-                const lines = text.split('\n').filter(line => line.trim() !== '');
+                const lines = splitCSVIntoRows(text);
                 if (lines.length < 2) {
                     resolve([]);
                     return;
                 }
-                const header = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+                // Remove BOM if present
+                const cleanedFirstLine = lines[0].replace(/^\ufeff/, '');
+
+                // Detect delimiter (tab, semicolon, or comma) - check in order of priority
+                let delimiter = ',';
+                if (cleanedFirstLine.includes('\t')) {
+                    delimiter = '\t';
+                } else if (cleanedFirstLine.includes(';')) {
+                    delimiter = ';';
+                }
+
+                const header = parseCSVLine(cleanedFirstLine, delimiter).map(h => (h || '').replace(/"/g, '').trim());
                 const rows = lines.slice(1);
+
+                console.log('🔍 CSV Headers detected:', JSON.stringify(header, null, 2));
+                console.log('📊 Delimiter used:', delimiter === '\t' ? 'TAB' : delimiter === ';' ? 'SEMICOLON' : 'COMMA');
+                console.log('📝 Total headers found:', header.length);
 
                 const getIndex = (name: string) => {
                     const index = header.indexOf(name);
@@ -112,67 +181,229 @@ const App: React.FC = () => {
                     return index;
                 };
 
-                const col = {
-                    id: getIndex('Codice di conferma'),
-                    status: getIndex('Stato'),
-                    guestName: getIndex("Nome dell'ospite"),
-                    adults: getIndex('N. di adulti'),
-                    children: getIndex('N. di bambini'),
-                    infants: getIndex('N. di neonati'),
-                    arrival: getIndex('Data di inizio'),
-                    departure: getIndex('Data di fine'),
-                    bookingDate: getIndex('Prenotata'),
-                    earnings: getIndex('Guadagni'),
-                };
-                
-                const reformatDate = (dateStr: string) => {
-                   if (!dateStr) return '';
-                   const parts = dateStr.split('/');
-                   if (parts.length === 3) {
-                       return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                   }
-                   return dateStr; // Assume YYYY-MM-DD if not DD/MM/YYYY
-                };
+                // Detect CSV format - use safer checks
+                const hasHeader = (name: string) => header.some(h => h && h.includes(name));
+                const isNewFormat = hasHeader('Tipo') && hasHeader('Guadagni lordi');
+                const isBookingFormat = hasHeader('N° di prenotazione') || hasHeader('Importo commissione');
 
-                const parsedReservations: Reservation[] = rows.map(row => {
-                    const values = row.split(',').map(v => v.replace(/"/g, '').trim());
-                    
-                    const earningsStr = values[col.earnings]?.replace('€', '').replace(',', '.').trim() || '0';
-                    const price = parseFloat(earningsStr);
-
-                    const guestDesc = `${values[col.adults]} adulti, ${values[col.children]} bambini, ${values[col.infants]} neonati`;
-                    
-                    let status: Status;
-                    const airbnbStatus = values[col.status]?.toLowerCase();
-                    if (airbnbStatus === 'cancellata') {
-                        status = Status.Cancelled;
-                    } else if (airbnbStatus.includes('mancata presentazione') || airbnbStatus.includes('no show') || airbnbStatus.includes('no-show')) {
-                        status = Status.NoShow;
-                    } else {
-                        status = Status.OK; // Treat 'Ospite precedente', 'Confermata', etc. as OK
-                    }
-
-                    return {
-                        id: values[col.id],
-                        platform: 'Airbnb' as Platform,
-                        guestName: values[col.guestName],
-                        guestsDescription: guestDesc,
-                        arrival: reformatDate(values[col.arrival]),
-                        departure: reformatDate(values[col.departure]),
-                        bookingDate: values[col.bookingDate], // Already YYYY-MM-DD
-                        status,
-                        price: isNaN(price) ? 0 : price,
-                        commission: 0, // CSV contains final payout, commission is not specified
+                if (isBookingFormat) {
+                    // Booking.com format with Italian headers
+                    const col = {
+                        id: getIndex('N° di prenotazione'),
+                        guestName: getIndex('Nome ospite(i)'),
+                        arrival: getIndex('Arrivo'),
+                        departure: getIndex('Partenza'),
+                        bookingDate: getIndex('Data di prenotazione'),
+                        status: getIndex('Stato'),
+                        people: getIndex('Persone'),
+                        price: getIndex('Prezzo'),
+                        commissionPercent: getIndex('% commissione'),
+                        commissionAmount: getIndex('Importo commissione'),
+                        nights: getIndex('Durata (notti)'),
                     };
-                }).filter(res => res.id); // Filter out any rows that couldn't be parsed
 
-                resolve(parsedReservations);
+                    console.log('📋 Column indices for Booking.com:', col);
+
+                    const parsedReservations: Reservation[] = rows
+                        .map((row, index) => {
+                            const values = parseCSVLine(row, delimiter).map(v => v.replace(/"/g, '').trim());
+
+                            // Log first reservation for debugging
+                            if (index === 0) {
+                                console.log('🔍 First row values:', values);
+                                console.log('📝 Guest name from col ' + col.guestName + ':', values[col.guestName]);
+                            }
+
+                            // Parse price (e.g., "144 EUR" or "144.50 EUR")
+                            const priceStr = values[col.price]?.replace('EUR', '').replace(',', '.').trim() || '0';
+                            const price = parseFloat(priceStr);
+
+                            // Parse commission amount (e.g., "25.92 EUR")
+                            const commissionStr = values[col.commissionAmount]?.replace('EUR', '').replace(',', '.').trim() || '0';
+                            const commission = parseFloat(commissionStr);
+
+                            // Parse status
+                            let status: Status;
+                            const bookingStatus = values[col.status]?.toLowerCase() || '';
+                            if (bookingStatus === 'no_show' || bookingStatus.includes('no show')) {
+                                status = Status.NoShow;
+                            } else if (bookingStatus === 'cancellata' || bookingStatus.includes('cancel')) {
+                                status = Status.Cancelled;
+                            } else {
+                                status = Status.OK; // 'ok' or other statuses
+                            }
+
+                            // Helper function to convert DD/MM/YYYY to YYYY-MM-DD
+                            const reformatBookingDate = (dateStr: string) => {
+                                if (!dateStr) return '';
+                                const parts = dateStr.split('/');
+                                if (parts.length === 3) {
+                                    const day = parts[0].padStart(2, '0');
+                                    const month = parts[1].padStart(2, '0');
+                                    const year = parts[2];
+                                    return `${year}-${month}-${day}`;
+                                }
+                                return dateStr;
+                            };
+
+                            // Parse dates (format: DD/MM/YYYY -> YYYY-MM-DD)
+                            const arrival = reformatBookingDate(values[col.arrival] || '');
+                            const departure = reformatBookingDate(values[col.departure] || '');
+
+                            // Parse booking date (format: "DD/MM/YYYY HH:MM" -> YYYY-MM-DD)
+                            const bookingDateFull = values[col.bookingDate] || '';
+                            const bookingDateOnly = bookingDateFull.split(' ')[0];
+                            const bookingDate = reformatBookingDate(bookingDateOnly);
+
+                            // Build guest description
+                            const people = values[col.people] || '';
+                            const nights = values[col.nights] || '1';
+                            const guestDesc = `${people} ${people === '1' ? 'persona' : 'persone'}, ${nights} ${nights === '1' ? 'notte' : 'notti'}`;
+
+                            return {
+                                id: values[col.id],
+                                platform: 'Booking.com' as Platform,
+                                guestName: values[col.guestName],
+                                guestsDescription: guestDesc,
+                                arrival,
+                                departure,
+                                bookingDate,
+                                status,
+                                price: isNaN(price) ? 0 : price,
+                                commission: isNaN(commission) ? 0 : commission,
+                            };
+                        })
+                        .filter((res): res is Reservation => !!res.id);
+
+                    resolve(parsedReservations);
+                } else if (isNewFormat) {
+                    // New format: Data,Tipo,Codice di Conferma,Data di prenotazione,Data di inizio,Data di fine,Notti,Ospite,Annuncio,Dettagli,Codice di riferimento,Valuta,Importo,Costi del servizio,Spese di pulizia,Guadagni lordi,Tassa di soggiorno,Annualità guadagni
+                    const col = {
+                        tipo: getIndex('Tipo'),
+                        id: getIndex('Codice di Conferma'),
+                        guestName: getIndex('Ospite'),
+                        arrival: getIndex('Data di inizio'),
+                        departure: getIndex('Data di fine'),
+                        bookingDate: getIndex('Data di prenotazione'),
+                        grossEarnings: getIndex('Guadagni lordi'),
+                        serviceFees: getIndex('Costi del servizio'),
+                        nights: getIndex('Notti'),
+                    };
+
+                    const reformatDate = (dateStr: string) => {
+                        if (!dateStr) return '';
+                        const parts = dateStr.split('/');
+                        if (parts.length === 3) {
+                            // New format uses MM/DD/YYYY (US format)
+                            const month = parts[0];
+                            const day = parts[1];
+                            const year = parts[2];
+                            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        }
+                        return dateStr;
+                    };
+
+                    // Group rows by Codice di Conferma and only keep "Prenotazione" rows
+                    const parsedReservations: Reservation[] = rows
+                        .map(row => {
+                            const values = parseCSVLine(row, delimiter).map(v => v.replace(/"/g, '').trim());
+                            const tipo = values[col.tipo]?.toLowerCase() || '';
+
+                            // Only process "Prenotazione" rows, skip tax rows
+                            if (!tipo.includes('prenotazione')) {
+                                return null;
+                            }
+
+                            const grossStr = values[col.grossEarnings]?.replace('€', '').replace(',', '.').trim() || '0';
+                            const price = parseFloat(grossStr);
+
+                            const serviceFeesStr = values[col.serviceFees]?.replace('€', '').replace(',', '.').trim() || '0';
+                            const commission = parseFloat(serviceFeesStr);
+
+                            const nights = parseInt(values[col.nights] || '1');
+                            const guestDesc = `${nights} ${nights === 1 ? 'notte' : 'notti'}`;
+
+                            return {
+                                id: values[col.id],
+                                platform: 'Airbnb' as Platform,
+                                guestName: values[col.guestName],
+                                guestsDescription: guestDesc,
+                                arrival: reformatDate(values[col.arrival]),
+                                departure: reformatDate(values[col.departure]),
+                                bookingDate: reformatDate(values[col.bookingDate]),
+                                status: Status.OK, // New format only shows confirmed bookings
+                                price: isNaN(price) ? 0 : price,
+                                commission: isNaN(commission) ? 0 : commission,
+                            };
+                        })
+                        .filter((res): res is Reservation => res !== null && !!res.id);
+
+                    resolve(parsedReservations);
+                } else {
+                    // Old format: original parser logic
+                    const col = {
+                        id: getIndex('Codice di conferma'),
+                        status: getIndex('Stato'),
+                        guestName: getIndex("Nome dell'ospite"),
+                        adults: getIndex('N. di adulti'),
+                        children: getIndex('N. di bambini'),
+                        infants: getIndex('N. di neonati'),
+                        arrival: getIndex('Data di inizio'),
+                        departure: getIndex('Data di fine'),
+                        bookingDate: getIndex('Prenotata'),
+                        earnings: getIndex('Guadagni'),
+                    };
+
+                    const reformatDate = (dateStr: string) => {
+                       if (!dateStr) return '';
+                       const parts = dateStr.split('/');
+                       if (parts.length === 3) {
+                           return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                       }
+                       return dateStr; // Assume YYYY-MM-DD if not DD/MM/YYYY
+                    };
+
+                    const parsedReservations: Reservation[] = rows.map(row => {
+                        const values = parseCSVLine(row).map(v => v.replace(/"/g, '').trim());
+
+                        const earningsStr = values[col.earnings]?.replace('€', '').replace(',', '.').trim() || '0';
+                        const price = parseFloat(earningsStr);
+
+                        const guestDesc = `${values[col.adults]} adulti, ${values[col.children]} bambini, ${values[col.infants]} neonati`;
+
+                        let status: Status;
+                        const airbnbStatus = values[col.status]?.toLowerCase();
+                        if (airbnbStatus === 'cancellata') {
+                            status = Status.Cancelled;
+                        } else if (airbnbStatus.includes('mancata presentazione') || airbnbStatus.includes('no show') || airbnbStatus.includes('no-show')) {
+                            status = Status.NoShow;
+                        } else {
+                            status = Status.OK; // Treat 'Ospite precedente', 'Confermata', etc. as OK
+                        }
+
+                        return {
+                            id: values[col.id],
+                            platform: 'Airbnb' as Platform,
+                            guestName: values[col.guestName],
+                            guestsDescription: guestDesc,
+                            arrival: reformatDate(values[col.arrival]),
+                            departure: reformatDate(values[col.departure]),
+                            bookingDate: values[col.bookingDate], // Already YYYY-MM-DD
+                            status,
+                            price: isNaN(price) ? 0 : price,
+                            commission: 0, // CSV contains final payout, commission is not specified
+                        };
+                    }).filter(res => res.id); // Filter out any rows that couldn't be parsed
+
+                    resolve(parsedReservations);
+                }
             } catch (e) {
                 reject(e);
             }
         };
         reader.onerror = (e) => reject(e);
-        reader.readAsText(file);
+        // Try Windows-1252 encoding first for Italian CSV exports
+        reader.readAsText(file, 'Windows-1252');
     });
   };
 
@@ -186,6 +417,17 @@ const App: React.FC = () => {
     setRetryCount(0);
 
     try {
+      // Check for unsupported Excel files
+      const excelFiles = Array.from(files).filter(file => {
+        const name = file.name.toLowerCase();
+        return name.endsWith('.xls') || name.endsWith('.xlsx');
+      });
+
+      if (excelFiles.length > 0) {
+        const fileNames = excelFiles.map(f => f.name).join(', ');
+        throw new Error(`File Excel non supportati: ${fileNames}. Per favore, esporta i dati in formato CSV e riprova. In Excel: File > Salva con nome > CSV (delimitato dal separatore di elenco).`);
+      }
+
       const csvFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.csv'));
       const otherFiles = Array.from(files).filter(file => !file.name.toLowerCase().endsWith('.csv'));
 
@@ -292,6 +534,8 @@ const App: React.FC = () => {
           onSetLoading={setForecastLoading}
           onSetError={setForecastError}
         />;
+      case 'calendar':
+        return <Calendar />;
       case 'dashboard':
       default:
         return <Dashboard

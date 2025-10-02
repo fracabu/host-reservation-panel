@@ -34,15 +34,19 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
         format: 'a4',
         unit: 'mm'
       });
-      let currentY = 25;
-      const pageHeight = doc.internal.pageSize.height;
-      const pageWidth = doc.internal.pageSize.width;
-      const margin = 20;
+      let currentY = 20;
+      const pageHeight = doc.internal.pageSize.height; // 297mm
+      const pageWidth = doc.internal.pageSize.width;   // 210mm
+      const margin = 15;
+      const maxTextWidth = pageWidth - (2 * margin);  // 180mm
+      const safeBottomMargin = 20; // Margine di sicurezza dal fondo
 
       // === COPERTINA ===
-      doc.setFontSize(22);
+      doc.setFontSize(20);
       doc.setTextColor(40, 40, 40);
-      doc.text('Report Completo Host Reservation Panel', margin, currentY);
+      const title = 'Report Completo Host Reservation Panel';
+      const titleSplit = doc.splitTextToSize(title, maxTextWidth);
+      doc.text(titleSplit, margin, currentY);
 
       currentY += 15;
       doc.setFontSize(12);
@@ -59,6 +63,12 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
       doc.setDrawColor(200, 200, 200);
       doc.line(margin, currentY, pageWidth - margin, currentY);
 
+      // Verifica spazio prima delle statistiche
+      if (currentY + 80 > pageHeight - safeBottomMargin) {
+        doc.addPage();
+        currentY = 20;
+      }
+
       // Statistiche generali
       currentY += 20;
       doc.setFontSize(16);
@@ -68,7 +78,8 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
       const totalRevenue = reservations.reduce((acc, r) => acc + r.price, 0);
       const totalCommission = reservations.reduce((acc, r) => acc + r.commission, 0);
       const totalNetPreTax = totalRevenue - totalCommission;
-      const totalNetPostTax = totalNetPreTax * 0.79; // Apply 21% tax
+      const totalCedolareSecca = totalNetPreTax * 0.21;
+      const totalNetPostTax = totalNetPreTax - totalCedolareSecca;
 
       const totalNights = reservations.reduce((acc, res) => {
         try {
@@ -85,32 +96,35 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
       doc.setFontSize(11);
       doc.setTextColor(60, 60, 60);
 
-      // Box statistiche con sfondo
-      const statsHeight = 56;
+      // Box statistiche con sfondo - aumentato per cedolare secca
+      const statsHeight = 72;
       doc.setFillColor(245, 245, 245);
-      doc.roundedRect(margin, currentY, pageWidth - 2 * margin, statsHeight, 3, 3, 'F');
+      doc.roundedRect(margin, currentY, maxTextWidth, statsHeight, 3, 3, 'F');
 
+      const textPadding = 4;
+      currentY += 10;
+      doc.text(`• Prenotazioni Totali: ${reservations.length}`, margin + textPadding, currentY);
       currentY += 8;
-      doc.text(`• Prenotazioni Totali: ${reservations.length}`, margin + 5, currentY);
+      doc.text(`• Notti Vendute: ${totalNights}`, margin + textPadding, currentY);
       currentY += 8;
-      doc.text(`• Notti Vendute: ${totalNights}`, margin + 5, currentY);
+      doc.text(`• Revenue Lordo: ${formatCurrency(totalRevenue)}`, margin + textPadding, currentY);
       currentY += 8;
-      doc.text(`• Revenue Lordo: ${formatCurrency(totalRevenue)}`, margin + 5, currentY);
+      doc.text(`• Commissioni Totali: ${formatCurrency(totalCommission)}`, margin + textPadding, currentY);
       currentY += 8;
-      doc.text(`• Commissioni Totali: ${formatCurrency(totalCommission)}`, margin + 5, currentY);
+      doc.text(`• Netto (pre-tasse): ${formatCurrency(totalNetPreTax)}`, margin + textPadding, currentY);
       currentY += 8;
-      doc.text(`• Netto (pre-tasse): ${formatCurrency(totalNetPreTax)}`, margin + 5, currentY);
+      doc.text(`• Cedolare Secca (21%): ${formatCurrency(totalCedolareSecca)}`, margin + textPadding, currentY);
       currentY += 8;
-      doc.text(`• Netto Finale (post-tasse 21%): ${formatCurrency(totalNetPostTax)}`, margin + 5, currentY);
+      doc.text(`• Netto Finale: ${formatCurrency(totalNetPostTax)}`, margin + textPadding, currentY);
       currentY += 8;
-      doc.text(`• Tariffa Media: ${formatCurrency(totalRevenue / totalNights)}/notte`, margin + 5, currentY);
+      doc.text(`• Tariffa Media: ${formatCurrency(totalRevenue / totalNights)}/notte`, margin + textPadding, currentY);
 
       currentY += 15;
 
       // === PAGINA NUOVA: GRAFICI ===
       if (chartsRef.current) {
         doc.addPage();
-        currentY = 25;
+        currentY = 20;
 
         doc.setFontSize(18);
         doc.setTextColor(40, 40, 40);
@@ -130,19 +144,21 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
           });
 
           const imgData = canvas.toDataURL('image/png', 0.9);
-          const maxWidth = pageWidth - 2 * margin;
-          const imgWidth = Math.min(maxWidth, 170);
+          const maxImgWidth = maxTextWidth;
+          const imgWidth = Math.min(maxImgWidth, 160);
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
+          const maxImgHeight = pageHeight - currentY - safeBottomMargin - 15;
 
           // Verifica se l'immagine rientra nella pagina
-          if (currentY + imgHeight + 20 > pageHeight - margin) {
+          if (imgHeight > maxImgHeight) {
             doc.addPage();
-            currentY = 25;
+            currentY = 20;
           } else {
             currentY += 15;
           }
 
-          doc.addImage(imgData, 'PNG', margin, currentY, imgWidth, Math.min(imgHeight, pageHeight - currentY - margin));
+          const finalImgHeight = Math.min(imgHeight, pageHeight - currentY - safeBottomMargin);
+          doc.addImage(imgData, 'PNG', margin, currentY, imgWidth, finalImgHeight);
         } catch (error) {
           console.error('Error capturing charts:', error);
           currentY += 20;
@@ -154,15 +170,20 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
 
       // === PAGINA NUOVA: TABELLA PRENOTAZIONI ===
       doc.addPage('landscape');
-      currentY = 25;
+      currentY = 20;
+      const landscapeWidth = doc.internal.pageSize.width;  // 297mm in landscape
+      const landscapeHeight = doc.internal.pageSize.height; // 210mm in landscape
+      const landscapeMargin = 15;
+      const landscapeMaxWidth = landscapeWidth - (2 * landscapeMargin);
+
       doc.setFontSize(18);
       doc.setTextColor(40, 40, 40);
-      doc.text('Dettaglio Prenotazioni', 20, currentY);
+      doc.text('Dettaglio Prenotazioni', landscapeMargin, currentY);
 
       // Linea separatrice
       currentY += 8;
       doc.setDrawColor(200, 200, 200);
-      doc.line(20, currentY, 277, currentY); // 277 = landscape width - margin
+      doc.line(landscapeMargin, currentY, landscapeWidth - landscapeMargin, currentY);
 
       const reservationRows = reservations.map(res => [
         res.id.substring(0, 10) + (res.id.length > 10 ? '...' : ''),
@@ -190,17 +211,19 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
           fontSize: 9
         },
         columnStyles: {
-          0: { cellWidth: 24 },
-          1: { cellWidth: 22 },
-          2: { cellWidth: 28 },
-          3: { cellWidth: 20 },
-          4: { cellWidth: 20 },
-          5: { cellWidth: 12, halign: 'center' },
-          6: { cellWidth: 24, halign: 'right' },
-          7: { cellWidth: 26 }
+          0: { cellWidth: 28 },  // ID
+          1: { cellWidth: 26 },  // Piattaforma
+          2: { cellWidth: 36 },  // Ospite (più spazio per nomi lunghi)
+          3: { cellWidth: 22 },  // Arrivo
+          4: { cellWidth: 22 },  // Partenza
+          5: { cellWidth: 16, halign: 'center' },  // Notti
+          6: { cellWidth: 30, halign: 'right' },   // Prezzo
+          7: { cellWidth: 30 }   // Stato
         },
-        margin: { left: 15, right: 15 },
+        margin: { left: landscapeMargin, right: landscapeMargin, top: 20, bottom: 20 },
         tableWidth: 'auto',
+        halign: 'center',
+        showHead: 'everyPage',
         didParseCell: function(data) {
           if (data.cell.section === 'body' && data.column.index === 7) {
             const status = data.cell.text[0];
@@ -212,20 +235,29 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
               data.cell.styles.textColor = [234, 88, 12];
             }
           }
+        },
+        didDrawPage: function(data) {
+          // Header su ogni pagina della tabella
+          if (data.pageNumber > 1) {
+            doc.setFontSize(16);
+            doc.setTextColor(40, 40, 40);
+            doc.text('Dettaglio Prenotazioni (continua)', landscapeMargin, 15);
+          }
         }
       });
 
       // === PAGINA NUOVA: RIEPILOGO MENSILE ===
       doc.addPage('landscape');
-      currentY = 25;
+      currentY = 20;
+
       doc.setFontSize(18);
       doc.setTextColor(40, 40, 40);
-      doc.text('Riepilogo Mensile per Piattaforma', 20, currentY);
+      doc.text('Riepilogo Mensile per Piattaforma', landscapeMargin, currentY);
 
       // Linea separatrice
       currentY += 8;
       doc.setDrawColor(200, 200, 200);
-      doc.line(20, currentY, 277, currentY);
+      doc.line(landscapeMargin, currentY, landscapeWidth - landscapeMargin, currentY);
 
       const tableBody: any[] = [];
 
@@ -236,15 +268,16 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
         acc.totalGross += summary.total.totalGross;
         acc.totalCommission += summary.total.totalCommission;
         acc.totalNetPreTax += summary.total.totalNetPreTax;
+        acc.totalCedolareSecca += summary.total.totalCedolareSecca;
         acc.totalNetPostTax += summary.total.totalNetPostTax;
         return acc;
       }, {
         activeBookings: 0, totalNights: 0, totalGross: 0,
-        totalCommission: 0, totalNetPreTax: 0, totalNetPostTax: 0
+        totalCommission: 0, totalNetPreTax: 0, totalCedolareSecca: 0, totalNetPostTax: 0
       });
 
       monthlyBreakdowns.forEach(summary => {
-        tableBody.push([{ content: summary.monthYear, colSpan: 7, styles: { fontStyle: 'bold', fillColor: '#e5e7eb', textColor: '#1f2937' } }]);
+        tableBody.push([{ content: summary.monthYear, colSpan: 8, styles: { fontStyle: 'bold', fillColor: '#e5e7eb', textColor: '#1f2937' } }]);
 
         [
           { name: '  Booking.com', data: summary.booking },
@@ -257,6 +290,7 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
             formatCurrencyForPDF(p.data.totalGross),
             formatCurrencyForPDF(p.data.totalCommission),
             formatCurrencyForPDF(p.data.totalNetPreTax),
+            formatCurrencyForPDF(p.data.totalCedolareSecca),
             formatCurrencyForPDF(p.data.totalNetPostTax)
           ]);
         });
@@ -268,26 +302,28 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
           { content: formatCurrencyForPDF(summary.total.totalGross), styles: { fontStyle: 'bold' } },
           { content: formatCurrencyForPDF(summary.total.totalCommission), styles: { fontStyle: 'bold' } },
           { content: formatCurrencyForPDF(summary.total.totalNetPreTax), styles: { fontStyle: 'bold' } },
+          { content: formatCurrencyForPDF(summary.total.totalCedolareSecca), styles: { fontStyle: 'bold' } },
           { content: formatCurrencyForPDF(summary.total.totalNetPostTax), styles: { fontStyle: 'bold' } }
         ]);
       });
 
       // Totali generali
       if (monthlyBreakdowns.length > 1) {
-        tableBody.push([{ content: '', colSpan: 7, styles: { fillColor: '#ffffff', minCellHeight: 8 } }]);
+        tableBody.push([{ content: '', colSpan: 8, styles: { fillColor: '#ffffff', minCellHeight: 8 } }]);
         tableBody.push([
-          { content: 'TOTALI GENERALI', styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
-          { content: grandTotals.activeBookings.toString(), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
-          { content: grandTotals.totalNights.toString(), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
-          { content: formatCurrencyForPDF(grandTotals.totalGross), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
-          { content: formatCurrencyForPDF(grandTotals.totalCommission), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
-          { content: formatCurrencyForPDF(grandTotals.totalNetPreTax), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
-          { content: formatCurrencyForPDF(grandTotals.totalNetPostTax), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } }
+          { content: 'TOTALI GENERALI', styles: { fontStyle: 'bold', fontSize: 11, fillColor: '#1f2937', textColor: '#ffffff' } },
+          { content: grandTotals.activeBookings.toString(), styles: { fontStyle: 'bold', fontSize: 11, fillColor: '#1f2937', textColor: '#ffffff' } },
+          { content: grandTotals.totalNights.toString(), styles: { fontStyle: 'bold', fontSize: 11, fillColor: '#1f2937', textColor: '#ffffff' } },
+          { content: formatCurrencyForPDF(grandTotals.totalGross), styles: { fontStyle: 'bold', fontSize: 11, fillColor: '#1f2937', textColor: '#ffffff' } },
+          { content: formatCurrencyForPDF(grandTotals.totalCommission), styles: { fontStyle: 'bold', fontSize: 11, fillColor: '#1f2937', textColor: '#ef4444' } },
+          { content: formatCurrencyForPDF(grandTotals.totalNetPreTax), styles: { fontStyle: 'bold', fontSize: 11, fillColor: '#1f2937', textColor: '#ffffff' } },
+          { content: formatCurrencyForPDF(grandTotals.totalCedolareSecca), styles: { fontStyle: 'bold', fontSize: 11, fillColor: '#1f2937', textColor: '#fbbf24' } },
+          { content: formatCurrencyForPDF(grandTotals.totalNetPostTax), styles: { fontStyle: 'bold', fontSize: 11, fillColor: '#1f2937', textColor: '#22c55e' } }
         ]);
       }
 
       autoTable(doc, {
-        head: [['Piattaforma', 'Prenot.', 'Notti', 'Lordo', 'Commissione', 'Netto (pre-tasse)', 'Netto Finale (21%)']],
+        head: [['Piattaforma', 'Prenot.', 'Notti', 'Lordo', 'Comm.', 'Netto (pre-tasse)', 'Ced. Secca', 'Netto Finale']],
         body: tableBody,
         startY: currentY + 10,
         theme: 'striped',
@@ -295,28 +331,46 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
           fillColor: [55, 65, 81],
           textColor: [255, 255, 255],
           fontStyle: 'bold',
-          fontSize: 10
-        },
-        bodyStyles: {
           fontSize: 9
         },
-        columnStyles: {
-          0: { cellWidth: 32 },
-          1: { cellWidth: 16, halign: 'right' },
-          2: { cellWidth: 16, halign: 'right' },
-          3: { cellWidth: 26, halign: 'right' },
-          4: { cellWidth: 26, halign: 'right' },
-          5: { cellWidth: 30, halign: 'right' },
-          6: { cellWidth: 30, halign: 'right' }
+        bodyStyles: {
+          fontSize: 8
         },
-        margin: { left: 15, right: 15 },
-        tableWidth: 'auto'
+        columnStyles: {
+          0: { cellWidth: 30 },  // Piattaforma
+          1: { cellWidth: 18, halign: 'center' },  // Prenot.
+          2: { cellWidth: 16, halign: 'center' },  // Notti
+          3: { cellWidth: 30, halign: 'right' },   // Lordo
+          4: { cellWidth: 26, halign: 'right' },   // Commissione
+          5: { cellWidth: 32, halign: 'right' },   // Netto (pre-tasse)
+          6: { cellWidth: 28, halign: 'right' },   // Cedolare Secca
+          7: { cellWidth: 32, halign: 'right' }    // Netto Finale
+        },
+        margin: { left: landscapeMargin, right: landscapeMargin, top: 20, bottom: 20 },
+        tableWidth: 'auto',
+        halign: 'center',
+        showHead: 'everyPage',
+        didParseCell: function(data) {
+          if (data.cell.section === 'body') {
+            if (data.column.index === 4) data.cell.styles.textColor = [220, 38, 38]; // Commissione: rosso
+            if (data.column.index === 6) data.cell.styles.textColor = [245, 158, 11]; // Cedolare: arancione
+            if (data.column.index === 7) data.cell.styles.textColor = [34, 197, 94]; // Netto Finale: verde
+          }
+        },
+        didDrawPage: function(data) {
+          // Header su ogni pagina della tabella
+          if (data.pageNumber > 1) {
+            doc.setFontSize(16);
+            doc.setTextColor(40, 40, 40);
+            doc.text('Riepilogo Mensile per Piattaforma (continua)', landscapeMargin, 15);
+          }
+        }
       });
 
       // === PAGINA PREVISIONI (se disponibili) ===
       if (forecast) {
         doc.addPage();
-        currentY = 25;
+        currentY = 20;
         doc.setFontSize(18);
         doc.setTextColor(40, 40, 40);
         doc.text('Previsioni e Strategie', margin, currentY);
@@ -324,7 +378,7 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
         // Linea separatrice
         currentY += 8;
         doc.setDrawColor(200, 200, 200);
-        doc.line(margin, currentY, pageWidth - margin, currentY);
+        doc.line(margin, currentY, margin + maxTextWidth, currentY);
 
         // === 1. ANALISI DI MERCATO ===
         currentY += 15;
@@ -340,16 +394,23 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
         currentY += 10;
         doc.setFontSize(10);
         doc.setTextColor(80, 80, 80);
-        const splitText = doc.splitTextToSize(forecast.demandOutlook, pageWidth - 2 * margin);
+        const splitText = doc.splitTextToSize(forecast.demandOutlook, maxTextWidth);
+
+        // Verifica se c'è spazio per tutto il testo
+        if (currentY + splitText.length * 5 + 15 > pageHeight - safeBottomMargin) {
+          doc.addPage();
+          currentY = 20;
+        }
+
         doc.text(splitText, margin, currentY);
-        currentY += splitText.length * 4 + 15;
+        currentY += splitText.length * 5 + 15;
 
         // === 2. EVENTI CHIAVE ===
         if (forecast.keyEvents && forecast.keyEvents.length > 0) {
           // Verifica spazio
-          if (currentY + 30 > pageHeight - margin) {
+          if (currentY + 30 > pageHeight - safeBottomMargin) {
             doc.addPage();
-            currentY = 25;
+            currentY = 20;
           }
 
           doc.setFontSize(14);
@@ -364,9 +425,9 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
 
           forecast.keyEvents.forEach((event, index) => {
             // Verifica spazio per evento
-            if (currentY + 20 > pageHeight - margin) {
+            if (currentY + 25 > pageHeight - safeBottomMargin) {
               doc.addPage();
-              currentY = 25;
+              currentY = 20;
             }
 
             doc.setFontSize(11);
@@ -388,9 +449,9 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
         // === 3. PREVISIONI QUANTITATIVE ===
         if (forecast.quantitativeForecast) {
           // Verifica spazio
-          if (currentY + 40 > pageHeight - margin) {
+          if (currentY + 45 > pageHeight - safeBottomMargin) {
             doc.addPage();
-            currentY = 25;
+            currentY = 20;
           }
 
           doc.setFontSize(14);
@@ -402,28 +463,28 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
           doc.setDrawColor(180, 180, 180);
           doc.line(margin, currentY, margin + 75, currentY);
 
-          // Box previsioni con sfondo
-          const forecastHeight = 35;
+          // Box previsioni con sfondo - aumentato altezza
+          const forecastHeight = 50;
           doc.setFillColor(240, 248, 255);
-          doc.roundedRect(margin, currentY + 5, pageWidth - 2 * margin, forecastHeight, 3, 3, 'F');
+          doc.roundedRect(margin, currentY + 8, maxTextWidth, forecastHeight, 3, 3, 'F');
 
-          currentY += 15;
+          currentY += 18; // Più spazio dall'alto
           doc.setFontSize(10);
           doc.setTextColor(40, 40, 40);
-          doc.text(`Tasso Occupazione: ${forecast.quantitativeForecast.occupancyRate}`, margin + 5, currentY);
-          currentY += 8;
-          doc.text(`Tariffa Media Giornaliera: ${forecast.quantitativeForecast.averageDailyRate}`, margin + 5, currentY);
-          currentY += 8;
-          doc.text(`Revenue Previsto: ${forecast.quantitativeForecast.projectedGrossRevenue}`, margin + 5, currentY);
-          currentY += 15;
+          doc.text(`Tasso Occupazione: ${forecast.quantitativeForecast.occupancyRate}`, margin + 8, currentY);
+          currentY += 10; // Più spazio tra le righe
+          doc.text(`Tariffa Media Giornaliera: ${forecast.quantitativeForecast.averageDailyRate}`, margin + 8, currentY);
+          currentY += 10;
+          doc.text(`Revenue Previsto: ${forecast.quantitativeForecast.projectedGrossRevenue}`, margin + 8, currentY);
+          currentY += 20; // Più spazio dopo il box
         }
 
         // === 4. AZIONI DI PREZZO ===
         if (forecast.pricingActions && forecast.pricingActions.length > 0) {
           // Verifica spazio
-          if (currentY + 30 > pageHeight - margin) {
+          if (currentY + 35 > pageHeight - safeBottomMargin) {
             doc.addPage();
-            currentY = 25;
+            currentY = 20;
           }
 
           doc.setFontSize(14);
@@ -437,41 +498,52 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
           currentY += 10;
 
           forecast.pricingActions.forEach((action, index) => {
+            // Calcola spazio necessario per questa azione
+            const eventTitleSplit = doc.splitTextToSize(`${index + 1}. ${action.eventName}`, maxTextWidth - 10);
+            const targetSplit = action.targetAudience ? doc.splitTextToSize(`   Target: ${action.targetAudience}`, maxTextWidth - 10) : [];
+
+            let neededSpace = 30; // Base space
+            neededSpace += eventTitleSplit.length * 6;
+            if (action.minimumStay) neededSpace += 6;
+            if (targetSplit.length > 0) neededSpace += targetSplit.length * 6;
+
             // Verifica spazio per azione
-            if (currentY + 25 > pageHeight - margin) {
+            if (currentY + neededSpace > pageHeight - safeBottomMargin) {
               doc.addPage();
-              currentY = 25;
+              currentY = 20;
             }
 
+            // Titolo evento con più spazio
             doc.setFontSize(11);
             doc.setTextColor(40, 40, 40);
-            doc.text(`${index + 1}. ${action.eventName}`, margin + 5, currentY);
-            currentY += 6;
+            doc.text(eventTitleSplit, margin + 5, currentY);
+            currentY += eventTitleSplit.length * 6;
 
+            // Dettagli con spacing migliorato
             doc.setFontSize(9);
             doc.setTextColor(100, 100, 100);
             doc.text(`   Periodo: ${action.dateRange}`, margin + 10, currentY);
-            currentY += 5;
+            currentY += 6;
             doc.text(`   Prezzo Consigliato: ${action.suggestedADR}`, margin + 10, currentY);
-            currentY += 5;
+            currentY += 6;
             if (action.minimumStay) {
               doc.text(`   Soggiorno Minimo: ${action.minimumStay}`, margin + 10, currentY);
-              currentY += 5;
+              currentY += 6;
             }
             if (action.targetAudience) {
-              doc.text(`   Target: ${action.targetAudience}`, margin + 10, currentY);
-              currentY += 5;
+              doc.text(targetSplit, margin + 10, currentY);
+              currentY += targetSplit.length * 6;
             }
-            currentY += 8;
+            currentY += 12; // Più spazio tra le azioni
           });
         }
 
         // === 5. RACCOMANDAZIONI STRATEGICHE ===
         if (forecast.strategicRecommendations && forecast.strategicRecommendations.length > 0) {
           // Verifica spazio per il titolo
-          if (currentY + 20 > pageHeight - margin) {
+          if (currentY + 25 > pageHeight - safeBottomMargin) {
             doc.addPage();
-            currentY = 25;
+            currentY = 20;
           }
 
           doc.setFontSize(14);
@@ -485,22 +557,29 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
           currentY += 10;
 
           forecast.strategicRecommendations.forEach((rec, index) => {
+            // Calcola spazio necessario per questa raccomandazione
+            const reasoningSplit = doc.splitTextToSize(rec.reasoning, maxTextWidth - 10);
+            const neededSpace = 20 + reasoningSplit.length * 4;
+
             // Verifica spazio per la raccomandazione
-            if (currentY + 30 > pageHeight - margin) {
+            if (currentY + neededSpace > pageHeight - safeBottomMargin) {
               doc.addPage();
-              currentY = 25;
+              currentY = 20;
             }
 
+            // Titolo raccomandazione
             doc.setFontSize(11);
             doc.setTextColor(40, 40, 40);
-            doc.text(`${index + 1}. ${rec.recommendation}`, margin + 5, currentY);
-            currentY += 7;
+            const recTitle = `${index + 1}. ${rec.recommendation}`;
+            const recTitleSplit = doc.splitTextToSize(recTitle, maxTextWidth - 10);
+            doc.text(recTitleSplit, margin + 5, currentY);
+            currentY += recTitleSplit.length * 6 + 2;
 
+            // Reasoning con spacing migliorato
             doc.setFontSize(9);
             doc.setTextColor(100, 100, 100);
-            const reasoningSplit = doc.splitTextToSize(rec.reasoning, pageWidth - 2 * margin - 10);
             doc.text(reasoningSplit, margin + 10, currentY);
-            currentY += reasoningSplit.length * 3.5 + 15;
+            currentY += reasoningSplit.length * 4.5 + 15;
           });
         }
       }

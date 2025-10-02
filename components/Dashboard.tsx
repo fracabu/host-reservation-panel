@@ -90,7 +90,9 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
     const totalGross = resList.reduce((acc, res) => acc + res.price, 0);
     const totalCommission = resList.reduce((acc, res) => acc + res.commission, 0);
     const totalNetPreTax = totalGross - totalCommission;
-    const totalNetPostTax = totalNetPreTax * 0.79; // Apply 21% tax
+    // Calculate cedolare secca (21% tax on net income)
+    const totalCedolareSecca = totalNetPreTax * 0.21;
+    const totalNetPostTax = totalNetPreTax - totalCedolareSecca;
 
     return {
       activeBookings: resList.length,
@@ -98,6 +100,7 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
       totalGross,
       totalCommission,
       totalNetPreTax,
+      totalCedolareSecca,
       totalNetPostTax
     };
   };
@@ -109,17 +112,17 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
   };
 
   const monthlyBreakdowns: MonthlyBreakdown[] = React.useMemo(() => {
-    const emptyStats: MonthlyStats = { activeBookings: 0, totalNights: 0, totalGross: 0, totalCommission: 0, totalNetPreTax: 0, totalNetPostTax: 0 };
-    
+    const emptyStats: MonthlyStats = { activeBookings: 0, totalNights: 0, totalGross: 0, totalCommission: 0, totalNetPreTax: 0, totalCedolareSecca: 0, totalNetPostTax: 0 };
+
     const summaries: { [key: string]: Omit<MonthlyBreakdown, 'monthYear'> } = {};
 
     activeReservations.forEach(res => {
       try {
         const arrival = new Date(res.arrival);
         if (isNaN(arrival.getTime())) return;
-        
+
         const monthYearKey = `${arrival.getFullYear()}-${String(arrival.getMonth() + 1).padStart(2, '0')}`;
-        
+
         if (!summaries[monthYearKey]) {
           summaries[monthYearKey] = {
             booking: { ...emptyStats },
@@ -131,9 +134,10 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
         const departure = new Date(res.departure);
         const diffTime = Math.abs(departure.getTime() - arrival.getTime());
         const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-        
+
         const netPreTax = res.price - res.commission;
-        const netPostTax = netPreTax * 0.79;
+        const cedolareSecca = netPreTax * 0.21;
+        const netPostTax = netPreTax - cedolareSecca;
 
         const platformKey = res.platform === 'Booking.com' ? 'booking' : 'airbnb';
 
@@ -142,6 +146,7 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
         summaries[monthYearKey][platformKey].totalGross += res.price;
         summaries[monthYearKey][platformKey].totalCommission += res.commission;
         summaries[monthYearKey][platformKey].totalNetPreTax += netPreTax;
+        summaries[monthYearKey][platformKey].totalCedolareSecca += cedolareSecca;
         summaries[monthYearKey][platformKey].totalNetPostTax += netPostTax;
 
         summaries[monthYearKey].total.activeBookings += 1;
@@ -149,6 +154,7 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
         summaries[monthYearKey].total.totalGross += res.price;
         summaries[monthYearKey].total.totalCommission += res.commission;
         summaries[monthYearKey].total.totalNetPreTax += netPreTax;
+        summaries[monthYearKey].total.totalCedolareSecca += cedolareSecca;
         summaries[monthYearKey].total.totalNetPostTax += netPostTax;
 
       } catch (e) {
@@ -200,23 +206,25 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
             
             <div className="bg-white p-6 rounded-lg shadow">
                  <h3 className="text-lg font-bold text-gray-800 mb-4">Booking.com</h3>
-                 <div className="space-y-4">
+                 <div className="space-y-3">
                     <p className="flex justify-between text-sm"><span>Notti Vendute:</span> <span className="font-semibold">{platformStats['Booking.com'].totalNights}</span></p>
                     <p className="flex justify-between text-sm"><span>Incasso Lordo:</span> <span className="font-semibold">{formatCurrency(platformStats['Booking.com'].totalGross)}</span></p>
-                     <p className="flex justify-between text-sm"><span>Commissioni:</span> <span className="font-semibold text-red-600">{formatCurrency(platformStats['Booking.com'].totalCommission)}</span></p>
-                    <p className="flex justify-between text-base"><span>Netto (pre-tasse):</span> <span className="font-semibold">{formatCurrency(platformStats['Booking.com'].totalNetPreTax)}</span></p>
-                    <p className="flex justify-between text-base font-bold"><span>Netto Finale (21%):</span> <span className="text-green-600">{formatCurrency(platformStats['Booking.com'].totalNetPostTax)}</span></p>
+                    <p className="flex justify-between text-sm border-t pt-2"><span>Commissioni:</span> <span className="font-semibold text-red-600">-{formatCurrency(platformStats['Booking.com'].totalCommission)}</span></p>
+                    <p className="flex justify-between text-sm"><span>Netto (pre-tasse):</span> <span className="font-semibold">{formatCurrency(platformStats['Booking.com'].totalNetPreTax)}</span></p>
+                    <p className="flex justify-between text-sm border-t pt-2"><span>Cedolare Secca (21%):</span> <span className="font-semibold text-orange-600">-{formatCurrency(platformStats['Booking.com'].totalCedolareSecca)}</span></p>
+                    <p className="flex justify-between text-base font-bold border-t-2 border-gray-300 pt-3"><span>Netto Finale:</span> <span className="text-green-600">{formatCurrency(platformStats['Booking.com'].totalNetPostTax)}</span></p>
                  </div>
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow">
                  <h3 className="text-lg font-bold text-gray-800 mb-4">Airbnb</h3>
-                 <div className="space-y-4">
+                 <div className="space-y-3">
                     <p className="flex justify-between text-sm"><span>Notti Vendute:</span> <span className="font-semibold">{platformStats['Airbnb'].totalNights}</span></p>
                     <p className="flex justify-between text-sm"><span>Incasso Lordo:</span> <span className="font-semibold">{formatCurrency(platformStats['Airbnb'].totalGross)}</span></p>
-                    <p className="flex justify-between text-sm"><span>Commissioni:</span> <span className="font-semibold text-red-600">{formatCurrency(platformStats['Airbnb'].totalCommission)}</span></p>
-                    <p className="flex justify-between text-base"><span>Netto (pre-tasse):</span> <span className="font-semibold">{formatCurrency(platformStats['Airbnb'].totalNetPreTax)}</span></p>
-                    <p className="flex justify-between text-base font-bold"><span>Netto Finale (21%):</span> <span className="text-green-600">{formatCurrency(platformStats['Airbnb'].totalNetPostTax)}</span></p>
+                    <p className="flex justify-between text-sm border-t pt-2"><span>Commissioni:</span> <span className="font-semibold text-red-600">-{formatCurrency(platformStats['Airbnb'].totalCommission)}</span></p>
+                    <p className="flex justify-between text-sm"><span>Netto (pre-tasse):</span> <span className="font-semibold">{formatCurrency(platformStats['Airbnb'].totalNetPreTax)}</span></p>
+                    <p className="flex justify-between text-sm border-t pt-2"><span>Cedolare Secca (21%):</span> <span className="font-semibold text-orange-600">-{formatCurrency(platformStats['Airbnb'].totalCedolareSecca)}</span></p>
+                    <p className="flex justify-between text-base font-bold border-t-2 border-gray-300 pt-3"><span>Netto Finale:</span> <span className="text-green-600">{formatCurrency(platformStats['Airbnb'].totalNetPostTax)}</span></p>
                  </div>
             </div>
         </div>

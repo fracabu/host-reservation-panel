@@ -25,6 +25,7 @@ export interface MonthlyStats {
   totalGross: number;
   totalCommission: number;
   totalNetPreTax: number;
+  totalCedolareSecca: number;
   totalNetPostTax: number;
 }
 

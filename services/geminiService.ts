@@ -137,38 +137,83 @@ export class GeminiService {
 
     const prompt = `ANALIZZA COMPLETAMENTE questo documento e trova TUTTE le prenotazioni presenti.
 
-IMPORTANTE:
-- Leggi tutto il documento dall'inizio alla fine
-- Non fermarti alle prime prenotazioni che trovi
-- Cerca in ogni pagina, tabella, lista presente
+IMPORTANTE - TIPOLOGIE DI DOCUMENTO:
+
+1. **BOOKING.COM - Lista Prenotazioni** (pagina web/PDF con tabella prenotazioni):
+   - Contiene una TABELLA con molte righe, ogni riga è una prenotazione
+   - Colonne tipiche: Nome ospite, Arrivo, Partenza, Stato, Prezzo, Commissione, Numero prenotazione
+   - DEVI LEGGERE OGNI RIGA DELLA TABELLA, non solo le prime!
+   - Stati possibili: "OK", "Mancata presentazione", "Cancellata"
+   - Cerca campi: "Nome dell'ospite", "Data di prenotazione", "Stato", "Prezzo", "Commissione e costi", "Numero prenotazione"
+
+2. **AIRBNB - Report dei guadagni** (PDF mensile aggregato):
+   - È un RIEPILOGO mensile, NON contiene le singole prenotazioni dettagliate
+   - Mostra solo: notti totali, guadagni aggregati, statistiche generali
+   - NON ha nomi ospiti, date specifiche di arrivo/partenza per ogni prenotazione
+   - SE vedi questo tipo di documento, ritorna array VUOTO: []
+   - Questi dati NON sono utilizzabili per creare prenotazioni singole
+
+3. **Screenshot/Immagini di prenotazioni**:
+   - Screenshot da app/siti di Airbnb o Booking.com
+   - Cerca tutti i dettagli visibili nella schermata
+
+REGOLE DI ESTRAZIONE:
+- Leggi TUTTO il documento dall'inizio alla fine
+- Non fermarti alle prime prenotazioni
+- Cerca in OGNI pagina, OGNI tabella, OGNI lista
 - Estrai OGNI SINGOLA prenotazione che vedi
 - PRESTA ATTENZIONE ALLO STATO di ogni prenotazione
 
 Per ogni prenotazione trovata, estrai questi dati esatti:
 
 {
-  "id": "codice/numero prenotazione (es: HM12345, ABC-789, etc)",
-  "platform": "Airbnb" oppure "Booking.com" (solo questi due valori)",
-  "guestName": "nome completo dell'ospite",
-  "guestsDescription": "dettagli ospiti (es: 2 adulti, 1 bambino)",
-  "arrival": "data arrivo in formato YYYY-MM-DD",
-  "departure": "data partenza in formato YYYY-MM-DD",
-  "bookingDate": "data prenotazione in formato YYYY-MM-DD",
-  "status": "GUARDA ATTENTAMENTE lo stato della prenotazione. Ci sono SOLO DUE possibilità:
-    - 'OK' se la prenotazione è normale/confermata/attiva
-    - 'Mancata presentazione' se vedi scritto no-show/mancata presentazione/non si è presentato",
-  "price": importo totale come numero (es: 150.50),
-  "commission": commissione come numero (0 se non specificato)
+  "id": "codice/numero prenotazione (es: 4915138809, HM12345, etc)",
+  "platform": "Booking.com" (se da Booking.com) oppure "Airbnb" (se da Airbnb) - SOLO questi due valori",
+  "guestName": "nome completo dell'ospite (es: Fabio Minella, Alessandra nardiello)",
+  "guestsDescription": "dettagli ospiti (es: 2 ospiti, 3 adulti, 2 adulti 1 bambino)",
+  "arrival": "data arrivo in formato YYYY-MM-DD (es: 2025-03-15)",
+  "departure": "data partenza in formato YYYY-MM-DD (es: 2025-03-16)",
+  "bookingDate": "data prenotazione in formato YYYY-MM-DD (es: 2025-02-14)",
+  "status": "GUARDA ATTENTAMENTE lo stato della prenotazione:
+    - 'OK' se vedi: OK, Pagata online, Confermata, normale, senza indicazioni di problemi
+    - 'Mancata presentazione' se vedi: Mancata presentazione, no-show, non si è presentato
+    - 'Cancellata' se vedi: Cancellata, Cancelled, Annullata",
+  "price": importo TOTALE/PREZZO come numero (es: 144 per €144, 264.96 per €264,96) - CERCA le colonne "Prezzo" o "Prezzo totale",
+  "commission": commissione come numero (es: 28.08 per €28,08) - CERCA le colonne "Commissione e costi" o "Costi del servizio", usa 0 se non specificato
 }
 
-STATI DA RICONOSCERE (solo questi due):
-- Se vedi "no show", "no-show", "non presentato", "mancata presentazione", qualsiasi indicazione di assenza → usa "Mancata presentazione"
-- Per tutto il resto (confermata, OK, normale, senza problemi) → usa "OK"
+CONVERSIONE DATE:
+- Se vedi "15 mar 2025" → converti in "2025-03-15"
+- Se vedi "17 apr 2025" → converti in "2025-04-17"
+- Se vedi "21 lug 2025" → converti in "2025-07-21"
+- Formato FINALE sempre: YYYY-MM-DD
 
-Ritorna un array JSON con TUTTE le prenotazioni trovate. Non lasciarne fuori nessuna.
-Se non trovi prenotazioni, ritorna: []
+STATI DA RICONOSCERE:
+- "OK" / "Pagata online" / "Confermata" → usa "OK"
+- "Mancata presentazione" / "no show" / "no-show" → usa "Mancata presentazione"
+- "Cancellata" / "Cancelled" → usa "Cancellata"
 
-RICORDA: Devo vedere TUTTI i dati che ci sono nel documento, non solo alcuni.`;
+VALIDAZIONE FINALE:
+- Se il documento è un "Report dei guadagni" Airbnb (senza liste dettagliate) → ritorna []
+- Se trovi prenotazioni dettagliate → ritorna TUTTE in un array JSON
+- Non lasciare fuori nessuna prenotazione
+- Controlla di aver letto tutto il documento fino in fondo
+
+ESEMPIO OUTPUT per Booking.com:
+[
+  {
+    "id": "4915138809",
+    "platform": "Booking.com",
+    "guestName": "Fabio Minella",
+    "guestsDescription": "2 ospiti",
+    "arrival": "2025-03-15",
+    "departure": "2025-03-16",
+    "bookingDate": "2025-02-14",
+    "status": "OK",
+    "price": 144,
+    "commission": 28.08
+  }
+]`;
 
     const responseSchema = {
         type: Type.ARRAY,
@@ -182,7 +227,7 @@ RICORDA: Devo vedere TUTTI i dati che ci sono nel documento, non solo alcuni.`;
             arrival: { type: Type.STRING },
             departure: { type: Type.STRING },
             bookingDate: { type: Type.STRING },
-            status: { type: Type.STRING, enum: ["OK", "Mancata presentazione"] },
+            status: { type: Type.STRING, enum: ["OK", "Mancata presentazione", "Cancellata"] },
             price: { type: Type.NUMBER },
             commission: { type: Type.NUMBER }
           },
@@ -196,7 +241,7 @@ RICORDA: Devo vedere TUTTI i dati che ci sono nel documento, non solo alcuni.`;
         const filePart = await this.fileToGenerativePart(file);
 
         const response = await this.ai.models.generateContent({
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.0-flash-exp',
           contents: { parts: [{ text: prompt }, filePart] },
           config: {
             responseMimeType: "application/json",

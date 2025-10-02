@@ -15,8 +15,10 @@ const ReservationsList: React.FC<ReservationsListProps> = ({ reservations }) => 
 
   const filteredAndSortedReservations = useMemo(() => {
     let filtered = reservations.filter(reservation => {
-      const matchesSearch = reservation.guestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           reservation.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const guestName = reservation.guestName || '';
+      const id = reservation.id || '';
+      const matchesSearch = guestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesPlatform = filterPlatform === 'all' || reservation.platform === filterPlatform;
       const matchesStatus = filterStatus === 'all' || reservation.status === filterStatus;
 
@@ -48,6 +50,7 @@ const ReservationsList: React.FC<ReservationsListProps> = ({ reservations }) => 
   };
 
   const formatCurrency = (value: number) => {
+    if (isNaN(value) || value === undefined || value === null) return '€0,00';
     return value.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
   };
 
@@ -61,10 +64,13 @@ const ReservationsList: React.FC<ReservationsListProps> = ({ reservations }) => 
 
   const calculateNights = (arrival: string, departure: string) => {
     try {
+      if (!arrival || !departure) return 1;
       const arrivalDate = new Date(arrival);
       const departureDate = new Date(departure);
+      if (isNaN(arrivalDate.getTime()) || isNaN(departureDate.getTime())) return 1;
       const diffTime = Math.abs(departureDate.getTime() - arrivalDate.getTime());
-      return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      return isNaN(nights) ? 1 : nights;
     } catch {
       return 1;
     }

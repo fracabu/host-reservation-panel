@@ -37,15 +37,16 @@ const AIChat: React.FC<AIChatProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-1.5-flash');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const availableModels = [
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Latest, fastest' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Stable, reliable' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'More capable' }
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Più veloce, può essere instabile' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Stabile e affidabile (consigliato)' },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Più potente, più lento' }
   ];
 
   const scrollToBottom = () => {
@@ -133,6 +134,13 @@ SEZIONE CORRENTE: ${currentSection}`;
 
     switch (currentSection) {
       case 'dashboard':
+        const totalCommissions = activeReservations.reduce((acc, r) => acc + r.commission, 0);
+        const netPreTax = totalRevenue - totalCommissions;
+        const netPostTax = netPreTax * 0.79; // 21% tax
+
+        const bookingRevenue = activeReservations.filter(r => r.platform === 'Booking.com').reduce((acc, r) => acc + r.price, 0);
+        const airbnbRevenue = activeReservations.filter(r => r.platform === 'Airbnb').reduce((acc, r) => acc + r.price, 0);
+
         context += `
 
 Sei nella sezione DASHBOARD. Puoi rispondere a domande su:
@@ -140,10 +148,28 @@ Sei nella sezione DASHBOARD. Puoi rispondere a domande su:
 - Performance finanziaria
 - Confronto tra piattaforme
 - Trend dei ricavi
-- Suggerimenti per migliorare le performance`;
+- Suggerimenti per migliorare le performance
+
+STATISTICHE FINANZIARIE DETTAGLIATE:
+- Incasso Lordo Totale: €${totalRevenue.toFixed(2)}
+- Commissioni Totali: €${totalCommissions.toFixed(2)}
+- Netto Pre-Tasse: €${netPreTax.toFixed(2)}
+- Netto Post-Tasse (21%): €${netPostTax.toFixed(2)}
+
+BREAKDOWN PER PIATTAFORMA:
+- Booking.com: €${bookingRevenue.toFixed(2)} (${activeBookingCount} prenotazioni)
+- Airbnb: €${airbnbRevenue.toFixed(2)} (${activeAirbnbCount} prenotazioni)`;
         break;
 
       case 'analytics':
+        const monthlyData = monthlyBreakdowns.map(mb => ({
+          month: mb.monthYear,
+          bookings: mb.total.activeBookings,
+          nights: mb.total.totalNights,
+          revenue: mb.total.totalGross,
+          avgRate: mb.total.totalNights > 0 ? mb.total.totalGross / mb.total.totalNights : 0
+        }));
+
         context += `
 
 Sei nella sezione ANALYTICS. Puoi rispondere a domande su:
@@ -151,7 +177,12 @@ Sei nella sezione ANALYTICS. Puoi rispondere a domande su:
 - Stagionalità dei dati
 - Performance mensili
 - Comparazioni temporali
-- Identificazione di pattern nei dati`;
+- Identificazione di pattern nei dati
+
+ANALISI MENSILE DETTAGLIATA:
+${monthlyData.map(m =>
+  `- ${m.month}: ${m.bookings} prenotazioni, ${m.nights} notti, €${m.revenue.toFixed(2)} (ADR: €${m.avgRate.toFixed(2)}/notte)`
+).join('\n')}`;
         break;
 
       case 'reservations':
@@ -162,7 +193,22 @@ Sei nella sezione PRENOTAZIONI. Puoi rispondere a domande su:
 - Analisi degli ospiti
 - Gestione delle cancellazioni
 - Ottimizzazione del pricing
-- Strategie per ridurre i no-show`;
+- Strategie per ridurre i no-show
+
+ELENCO PRENOTAZIONI ATTIVE (le prime 10 più recenti):
+${activeReservations.slice(0, 10).map((r, idx) => {
+  const arrival = new Date(r.arrival);
+  const departure = new Date(r.departure);
+  const nights = Math.max(1, Math.ceil((departure.getTime() - arrival.getTime()) / (1000 * 60 * 60 * 24)));
+  return `${idx + 1}. ${r.guestName} - ${r.platform}
+   ID: ${r.id}
+   Arrivo: ${r.arrival}, Partenza: ${r.departure} (${nights} notti)
+   Prezzo: €${r.price.toFixed(2)}, Commissioni: €${r.commission.toFixed(2)}
+   Stato: ${r.status}
+   Ospiti: ${r.guestsDescription}`;
+}).join('\n\n')}
+
+${activeReservations.length > 10 ? `\n... e altre ${activeReservations.length - 10} prenotazioni` : ''}`;
         break;
 
       case 'forecast':
@@ -171,11 +217,24 @@ Sei nella sezione PRENOTAZIONI. Puoi rispondere a domande su:
 
 Sei nella sezione PREVISIONI. Hai accesso a:
 - Analisi di mercato: ${forecast.demandOutlook}
-- Eventi chiave identificati
-- Raccomandazioni strategiche
-- Azioni di pricing suggerite
+- Eventi chiave identificati: ${forecast.keyEvents?.length || 0}
+- Raccomandazioni strategiche: ${forecast.strategicRecommendations?.length || 0}
+- Azioni di pricing suggerite: ${forecast.pricingActions?.length || 0}
 
-Puoi rispondere a domande su strategie future, pricing dinamico, e ottimizzazione revenue.`;
+EVENTI CHIAVE IDENTIFICATI:
+${forecast.keyEvents?.slice(0, 5).map((e, idx) =>
+  `${idx + 1}. ${e.eventName} (${e.dateRange})
+   Tipo: ${e.eventType}
+   Impatto: ${e.impact}`
+).join('\n\n') || 'Nessun evento identificato'}
+
+RACCOMANDAZIONI PRINCIPALI:
+${forecast.strategicRecommendations?.slice(0, 3).map((r, idx) =>
+  `${idx + 1}. ${r.recommendation}
+   Motivazione: ${r.reasoning}`
+).join('\n\n') || 'Nessuna raccomandazione disponibile'}
+
+Puoi rispondere a domande su strategie future, pricing dinamico, eventi locali e ottimizzazione revenue.`;
         }
         break;
     }
@@ -195,18 +254,17 @@ IMPORTANTE: I no-show sono inclusi nei calcoli di revenue e notti perché l'host
 
 ISTRUZIONI:
 - Rispondi sempre in italiano
-- Sii conciso ma informativo (max 300 parole)
 - Fornisci insights pratici e actionable
-- Se chiedi grafici, descrivi cosa vedi nei dati
 - Suggerisci azioni concrete per migliorare il business
 - I no-show contano come revenue attivo (ospite ha pagato ma non si è presentato)
 - Solo le cancellazioni sono escluse dai totali di revenue
-- Non inventare dati che non hai`;
+- Non inventare dati che non hai
+- Completa sempre la risposta, non troncarla`;
 
     return context;
   };
 
-  const sendMessage = async () => {
+  const sendMessage = async (retryCount = 0) => {
     if (!inputText.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -217,6 +275,7 @@ ISTRUZIONI:
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const originalInput = inputText;
     setInputText('');
     setIsLoading(true);
 
@@ -230,22 +289,38 @@ ISTRUZIONI:
 
       const prompt = `${context}
 
-DOMANDA DELL'UTENTE: ${inputText}
+DOMANDA DELL'UTENTE: ${originalInput}
 
-Rispondi in modo specifico e utile basandoti sui dati forniti.`;
+Rispondi in modo specifico e utile basandoti sui dati forniti. Mantieni la risposta completa e dettagliata.`;
 
-      const response = await ai.models.generateContent({
-        model: selectedModel,
-        contents: prompt,
-        config: {
-          maxOutputTokens: 800,
-          temperature: 0.7
-        }
-      });
+      // Enhanced API configuration
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model: selectedModel,
+          contents: prompt,
+          config: {
+            maxOutputTokens: 1500, // Increased token limit
+            temperature: 0.7,
+            topP: 0.8,
+            topK: 40,
+            stopSequences: [],
+          }
+        }),
+        // Timeout after 30 seconds
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), 30000)
+        )
+      ]) as any;
+
+      const responseText = response.text || response.response?.text() || "";
+
+      if (!responseText.trim()) {
+        throw new Error("Risposta vuota dal modello");
+      }
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: response.text || "Errore nel generare la risposta.",
+        text: responseText,
         isUser: false,
         timestamp: new Date()
       };
@@ -254,15 +329,49 @@ Rispondi in modo specifico e utile basandoti sui dati forniti.`;
 
     } catch (error: any) {
       console.error('Chat error:', error);
+
+      // Retry logic for transient errors
+      const isRetryableError = error.message?.includes('503') ||
+                               error.message?.includes('502') ||
+                               error.message?.includes('Timeout') ||
+                               error.message?.includes('QUOTA_EXCEEDED') ||
+                               error.message?.includes('temporarily unavailable');
+
+      if (isRetryableError && retryCount < 2) {
+        console.log(`Retrying request (attempt ${retryCount + 1}/3)...`);
+        setRetryAttempt(retryCount + 1);
+        // Wait before retry with exponential backoff
+        setTimeout(() => {
+          setInputText(originalInput);
+          sendMessage(retryCount + 1);
+        }, Math.pow(2, retryCount) * 1000);
+        return;
+      }
+
+      // Enhanced error messages
+      let errorText = "Errore di connessione.";
+      if (error.message?.includes('503') || error.message?.includes('502')) {
+        errorText = "🔄 Servizio temporaneamente non disponibile. Riprovo automaticamente...";
+      } else if (error.message?.includes('QUOTA_EXCEEDED')) {
+        errorText = "❌ Quota API esaurita. Prova più tardi o cambia modello.";
+      } else if (error.message?.includes('Timeout')) {
+        errorText = "⏱️ Timeout: la richiesta ha richiesto troppo tempo. Riprova con una domanda più semplice.";
+      } else if (error.message?.includes('API_KEY')) {
+        errorText = "🔑 Chiave API non configurata correttamente.";
+      } else if (error.message?.includes('SAFETY')) {
+        errorText = "⚠️ Risposta bloccata dai filtri di sicurezza. Riprova con una domanda diversa.";
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: `Errore: ${error.message?.includes('503') ? 'Servizio temporaneamente non disponibile. Riprova.' : 'Errore di connessione.'}`,
+        text: errorText,
         isUser: false,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setRetryAttempt(0);
     }
   };
 
@@ -405,10 +514,17 @@ Rispondi in modo specifico e utile basandoti sui dati forniti.`;
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-gray-700 rounded-lg px-3 py-2">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                    {retryAttempt > 0 && (
+                      <span className="text-xs text-yellow-400">
+                        Retry {retryAttempt}/3
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

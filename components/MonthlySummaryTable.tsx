@@ -17,12 +17,12 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
   const handleDownloadCSV = () => {
     if (summaries.length === 0) return;
 
-    const headers = ['Mese/Anno', 'Piattaforma', 'Prenotazioni', 'Notti', 'Lordo', 'Commissione', 'Netto (pre-tasse)', 'Netto Finale (21%)'];
-    
+    const headers = ['Mese/Anno', 'Piattaforma', 'Prenotazioni', 'Notti', 'Lordo', 'Commissione', 'Netto (pre-tasse)', 'Cedolare Secca (21%)', 'Netto Finale'];
+
     const rows = summaries.flatMap(s => [
-        [s.monthYear.replace(',', ''), 'Booking.com', s.booking.activeBookings, s.booking.totalNights, s.booking.totalGross, s.booking.totalCommission, s.booking.totalNetPreTax, s.booking.totalNetPostTax],
-        ['', 'Airbnb', s.airbnb.activeBookings, s.airbnb.totalNights, s.airbnb.totalGross, s.airbnb.totalCommission, s.airbnb.totalNetPreTax, s.airbnb.totalNetPostTax],
-        ['', 'Totale', s.total.activeBookings, s.total.totalNights, s.total.totalGross, s.total.totalCommission, s.total.totalNetPreTax, s.total.totalNetPostTax]
+        [s.monthYear.replace(',', ''), 'Booking.com', s.booking.activeBookings, s.booking.totalNights, s.booking.totalGross, s.booking.totalCommission, s.booking.totalNetPreTax, s.booking.totalCedolareSecca, s.booking.totalNetPostTax],
+        ['', 'Airbnb', s.airbnb.activeBookings, s.airbnb.totalNights, s.airbnb.totalGross, s.airbnb.totalCommission, s.airbnb.totalNetPreTax, s.airbnb.totalCedolareSecca, s.airbnb.totalNetPostTax],
+        ['', 'Totale', s.total.activeBookings, s.total.totalNights, s.total.totalGross, s.total.totalCommission, s.total.totalNetPreTax, s.total.totalCedolareSecca, s.total.totalNetPostTax]
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -54,6 +54,7 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
       acc.totalGross += summary.total.totalGross;
       acc.totalCommission += summary.total.totalCommission;
       acc.totalNetPreTax += summary.total.totalNetPreTax;
+      acc.totalCedolareSecca += summary.total.totalCedolareSecca;
       acc.totalNetPostTax += summary.total.totalNetPostTax;
       return acc;
     }, {
@@ -62,12 +63,13 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
       totalGross: 0,
       totalCommission: 0,
       totalNetPreTax: 0,
+      totalCedolareSecca: 0,
       totalNetPostTax: 0
     });
 
     summaries.forEach(summary => {
       // Month Header
-      tableBody.push([{ content: summary.monthYear, colSpan: 7, styles: { fontStyle: 'bold', fillColor: '#e5e7eb', textColor: '#1f2937' } }]);
+      tableBody.push([{ content: summary.monthYear, colSpan: 8, styles: { fontStyle: 'bold', fillColor: '#e5e7eb', textColor: '#1f2937' } }]);
 
       // Platform Rows
       const platforms: Array<{ name: string, data: MonthlyStats }> = [
@@ -83,6 +85,7 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
             formatCurrencyForPDF(p.data.totalGross),
             formatCurrencyForPDF(p.data.totalCommission),
             formatCurrencyForPDF(p.data.totalNetPreTax),
+            formatCurrencyForPDF(p.data.totalCedolareSecca),
             formatCurrencyForPDF(p.data.totalNetPostTax)
         ]);
       });
@@ -95,6 +98,7 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
         { content: formatCurrencyForPDF(summary.total.totalGross), styles: { fontStyle: 'bold' } },
         { content: formatCurrencyForPDF(summary.total.totalCommission), styles: { fontStyle: 'bold' } },
         { content: formatCurrencyForPDF(summary.total.totalNetPreTax), styles: { fontStyle: 'bold' } },
+        { content: formatCurrencyForPDF(summary.total.totalCedolareSecca), styles: { fontStyle: 'bold' } },
         { content: formatCurrencyForPDF(summary.total.totalNetPostTax), styles: { fontStyle: 'bold' } }
       ]);
     });
@@ -102,7 +106,7 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
     // Aggiungi riga vuota e totali generali
     if (summaries.length > 1) {
       tableBody.push([
-        { content: '', colSpan: 7, styles: { fillColor: '#ffffff', minCellHeight: 8 } }
+        { content: '', colSpan: 8, styles: { fillColor: '#ffffff', minCellHeight: 8 } }
       ]);
 
       tableBody.push([
@@ -110,29 +114,37 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
         { content: grandTotals.activeBookings.toString(), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
         { content: grandTotals.totalNights.toString(), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
         { content: formatCurrencyForPDF(grandTotals.totalGross), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
-        { content: formatCurrencyForPDF(grandTotals.totalCommission), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff', textColor: '#ef4444' } },
+        { content: formatCurrencyForPDF(grandTotals.totalCommission), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ef4444' } },
         { content: formatCurrencyForPDF(grandTotals.totalNetPreTax), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#ffffff' } },
+        { content: formatCurrencyForPDF(grandTotals.totalCedolareSecca), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#fbbf24' } },
         { content: formatCurrencyForPDF(grandTotals.totalNetPostTax), styles: { fontStyle: 'bold', fontSize: 12, fillColor: '#1f2937', textColor: '#22c55e' } }
       ]);
     }
   
     autoTable(doc, {
-      head: [['Piattaforma', 'Prenot.', 'Notti', 'Lordo', 'Commissione', 'Netto (pre-tasse)', 'Netto Finale (21%)']],
+      head: [['Piattaforma', 'Prenot.', 'Notti', 'Lordo', 'Comm.', 'Netto (pre-tasse)', 'Ced. Secca', 'Netto Finale']],
       body: tableBody,
       startY: 35,
       theme: 'grid',
-      margin: { top: 35, left: 14, right: 14, bottom: 20 },
-      headStyles: { fillColor: '#374151', textColor: '#ffffff', fontStyle: 'bold' },
+      margin: { top: 35, left: 10, right: 10, bottom: 20 },
+      halign: 'center',
+      showHead: 'everyPage',
+      headStyles: { fillColor: '#374151', textColor: '#ffffff', fontStyle: 'bold', fontSize: 9 },
       columnStyles: {
-        0: { cellWidth: 45 },
-        1: { cellWidth: 18, halign: 'right' }, 2: { cellWidth: 18, halign: 'right' },
-        3: { cellWidth: 35, halign: 'right' }, 4: { cellWidth: 35, halign: 'right' },
-        5: { cellWidth: 40, halign: 'right' }, 6: { cellWidth: 40, halign: 'right' },
+        0: { cellWidth: 30 },  // Piattaforma
+        1: { cellWidth: 18, halign: 'center' },  // Prenot.
+        2: { cellWidth: 16, halign: 'center' },  // Notti
+        3: { cellWidth: 30, halign: 'right' },   // Lordo
+        4: { cellWidth: 26, halign: 'right' },   // Commissione
+        5: { cellWidth: 32, halign: 'right' },   // Netto (pre-tasse)
+        6: { cellWidth: 28, halign: 'right' },   // Cedolare Secca
+        7: { cellWidth: 32, halign: 'right' },   // Netto Finale
       },
       didParseCell: function(data) {
         if (data.cell.section === 'body') {
           if (data.column.index === 4) data.cell.styles.textColor = '#dc2626'; // Commission: red
-          if (data.column.index === 6) data.cell.styles.textColor = '#16a34a'; // Final Net: green
+          if (data.column.index === 6) data.cell.styles.textColor = '#f59e0b'; // Cedolare: orange
+          if (data.column.index === 7) data.cell.styles.textColor = '#16a34a'; // Final Net: green
           if (data.row.raw[0].content === 'Totale Mese') data.cell.styles.fillColor = '#f3f4f6';
         }
       },
@@ -165,6 +177,7 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
       <td className={`px-3 py-4 whitespace-nowrap text-sm font-medium text-right ${isTotal ? 'text-gray-900' : 'text-gray-800'}`}>{formatCurrency(data.totalGross)}</td>
       <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-red-600">{formatCurrency(data.totalCommission)}</td>
       <td className={`px-3 py-4 whitespace-nowrap text-sm font-semibold text-right ${isTotal ? 'text-gray-800' : 'text-gray-700'}`}>{formatCurrency(data.totalNetPreTax)}</td>
+      <td className="px-3 py-4 whitespace-nowrap text-sm text-right text-orange-600">{formatCurrency(data.totalCedolareSecca)}</td>
       <td className={`pl-3 pr-6 py-4 whitespace-nowrap text-sm font-semibold text-right ${isTotal ? 'text-indigo-700' : 'text-green-600'}`}>{formatCurrency(data.totalNetPostTax)}</td>
     </tr>
   );
@@ -202,14 +215,15 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
               <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Lordo</th>
               <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Commissione</th>
               <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Netto (pre-tasse)</th>
-              <th scope="col" className="pl-3 pr-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Netto Finale (21%)</th>
+              <th scope="col" className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cedolare Secca (21%)</th>
+              <th scope="col" className="pl-3 pr-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Netto Finale</th>
             </tr>
           </thead>
           <tbody className="bg-white">
             {summaries.map((summary) => (
               <React.Fragment key={summary.monthYear}>
                 <tr className="bg-gray-200">
-                   <td colSpan={7} className="px-6 py-2 whitespace-nowrap text-sm font-bold text-gray-800">{summary.monthYear}</td>
+                   <td colSpan={8} className="px-6 py-2 whitespace-nowrap text-sm font-bold text-gray-800">{summary.monthYear}</td>
                 </tr>
                 <DataRow platform="Booking.com" data={summary.booking} />
                 <DataRow platform="Airbnb" data={summary.airbnb} />
@@ -218,7 +232,7 @@ const MonthlySummaryTable: React.FC<MonthlySummaryTableProps> = ({ summaries }) 
             ))}
              {summaries.length === 0 && (
                 <tr>
-                    <td colSpan={7} className="text-center py-10 text-gray-500">Nessun dato disponibile per il riepilogo.</td>
+                    <td colSpan={8} className="text-center py-10 text-gray-500">Nessun dato disponibile per il riepilogo.</td>
                 </tr>
             )}
           </tbody>
