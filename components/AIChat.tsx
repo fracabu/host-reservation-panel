@@ -395,13 +395,15 @@ Rispondi in modo specifico e utile basandoti sui dati forniti. Mantieni la rispo
   return (
     <div
       ref={sidebarRef}
-      className={`bg-gray-900 text-white transition-all duration-300 flex flex-col relative ${
-        isCollapsed ? 'w-16' : ''
-      }`}
-      style={{ width: isCollapsed ? '64px' : `${width}px` }}
+      className={`bg-gray-900 text-white transition-all duration-300 flex flex-col relative h-full
+        ${isCollapsed ? 'w-16' : 'w-full lg:w-auto'}
+      `}
+      style={{
+        width: isCollapsed ? '64px' : (typeof window !== 'undefined' && window.innerWidth < 1024 ? '100vw' : `${width}px`)
+      }}
     >
-      {/* Resize handle */}
-      {!isCollapsed && (
+      {/* Resize handle - Desktop only */}
+      {!isCollapsed && typeof window !== 'undefined' && window.innerWidth >= 1024 && (
         <div
           className="absolute left-0 top-0 bottom-0 w-1 bg-gray-700 hover:bg-indigo-500 cursor-col-resize z-10"
           onMouseDown={handleMouseDown}

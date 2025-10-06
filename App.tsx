@@ -19,7 +19,9 @@ const App: React.FC = () => {
   const [retryCount, setRetryCount] = useState<number>(0);
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState<boolean>(false);
   const [chatCollapsed, setChatCollapsed] = useState<boolean>(false);
+  const [chatMobileOpen, setChatMobileOpen] = useState<boolean>(false);
   const [chatWidth, setChatWidth] = useState<number>(400);
   const [forecast, setForecast] = useState<any>(null);
   const [forecastLoading, setForecastLoading] = useState<boolean>(false);
@@ -551,7 +553,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
       <input
         type="file"
         ref={fileInputRef}
@@ -564,22 +566,48 @@ const App: React.FC = () => {
         className="hidden"
       />
 
-      {/* Sidebar */}
-      <Sidebar
-        activeView={activeView}
-        onViewChange={setActiveView}
-        isCollapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+      {/* Mobile Sidebar Overlay */}
+      {sidebarMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setSidebarMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Hidden on mobile, shown as drawer when open */}
+      <div className={`
+        fixed lg:static inset-y-0 left-0 z-50
+        transform transition-transform duration-300 ease-in-out
+        ${sidebarMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <Sidebar
+          activeView={activeView}
+          onViewChange={(view) => {
+            setActiveView(view);
+            setSidebarMobileOpen(false); // Close mobile menu after selection
+          }}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
-          <div className="px-6 py-4">
+          <div className="px-4 sm:px-6 py-3 sm:py-4">
             <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-4">
-                <h1 className="text-2xl font-bold text-gray-900">Pannello Host</h1>
+              <div className="flex items-center space-x-2 sm:space-x-4">
+                {/* Mobile Menu Button */}
+                <button
+                  onClick={() => setSidebarMobileOpen(!sidebarMobileOpen)}
+                  className="lg:hidden p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Pannello Host</h1>
                 {reservations.length > 0 && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     {reservations.length} prenotazioni
@@ -617,25 +645,52 @@ const App: React.FC = () => {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-auto bg-gray-50">
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {renderContent()}
           </div>
         </main>
       </div>
 
-      {/* AI Chat Sidebar */}
-      <AIChat
-        isCollapsed={chatCollapsed}
-        onToggleCollapse={() => setChatCollapsed(!chatCollapsed)}
-        reservations={reservations}
-        monthlyBreakdowns={monthlyBreakdowns}
-        forecast={forecast}
-        currentSection={activeView}
-        width={chatWidth}
-        onWidthChange={setChatWidth}
-        isProcessingFiles={isLoading}
-        processingFileNames={processingFileNames}
-      />
+      {/* Mobile Chat Button */}
+      <button
+        onClick={() => setChatMobileOpen(!chatMobileOpen)}
+        className="lg:hidden fixed bottom-4 right-4 z-30 bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      >
+        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+      </button>
+
+      {/* Mobile Chat Overlay */}
+      {chatMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setChatMobileOpen(false)}
+        />
+      )}
+
+      {/* AI Chat Sidebar - Hidden on mobile unless chatMobileOpen */}
+      <div className={`
+        fixed lg:static inset-y-0 right-0 z-50 lg:z-auto
+        transform transition-transform duration-300 ease-in-out
+        ${chatMobileOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+      `}>
+        <AIChat
+          isCollapsed={chatCollapsed}
+          onToggleCollapse={() => {
+            setChatCollapsed(!chatCollapsed);
+            if (!chatCollapsed) setChatMobileOpen(false); // Close mobile chat when collapsing
+          }}
+          reservations={reservations}
+          monthlyBreakdowns={monthlyBreakdowns}
+          forecast={forecast}
+          currentSection={activeView}
+          width={chatWidth}
+          onWidthChange={setChatWidth}
+          isProcessingFiles={isLoading}
+          processingFileNames={processingFileNames}
+        />
+      </div>
     </div>
   );
 };

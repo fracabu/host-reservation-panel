@@ -104,15 +104,23 @@ The application follows a flat component structure in the `components/` director
 - **ReservationsList.tsx**: Comprehensive reservation management with filtering and sorting
 - **ForecastingAssistant.tsx**: AI-powered forecasting and pricing recommendations (with persistent state)
 - **Sidebar.tsx**: Navigation sidebar with collapsible design
-- **AIChat.tsx**: Interactive AI assistant for data insights
+- **AIChat.tsx**: Interactive AI assistant with multi-model support (Gemini 2.5 Flash, 1.5 Flash, 1.5 Pro)
+- **Calendar.tsx**: Calendar view for reservations
 - **ComprehensiveReport.tsx**: Professional PDF report generation with forecasts
 - **ChartsForPDF.tsx**: Chart components optimized for PDF export
 - **MonthlySummaryTable.tsx**: Monthly financial breakdown table
 - **StatsCard.tsx**: Reusable statistics display cards
 - **StatusBadge.tsx**: Status indicator component
 - **FileUpload.tsx**: Drag-and-drop file upload interface
+- **ReservationsTable.tsx**: Table component for displaying reservations
+- **PricingAssistant.tsx**: Pricing recommendations component
 
 All components are TypeScript React functional components using hooks for state management.
+
+## Services Architecture
+
+- **services/geminiService.ts**: Handles all Google Gemini AI interactions for image/PDF processing and chat
+- **services/data.ts**: Data processing and aggregation utilities
 
 ## Recent Updates (2025)
 
@@ -137,3 +145,18 @@ All components are TypeScript React functional components using hooks for state 
 - **Analytics**: Charts and advanced metrics
 - **Reservations**: Detailed reservation management
 - **Forecasting**: AI-powered pricing and demand analysis
+- **Calendar**: Calendar view for reservation visualization
+
+### AI Chat Assistant Features
+- **Multi-Model Support**: Switch between Gemini 2.5 Flash (fast, experimental), 1.5 Flash (stable, recommended), and 1.5 Pro (powerful)
+- **Resizable Sidebar**: Drag to adjust chat panel width (320px-800px)
+- **Context-Aware**: Automatically includes reservation data, monthly breakdowns, and forecast in conversations
+- **Mobile Responsive**: Collapsible on desktop, drawer on mobile
+
+### CSV Format Support
+The CSV parser intelligently detects and handles three formats:
+1. **Booking.com Format**: Italian headers with N° di prenotazione, Importo commissione
+2. **Airbnb New Format** (2025): Headers include "Tipo", "Guadagni lordi", filters "Prenotazione" rows
+3. **Airbnb Old Format**: Original Italian format with "Codice di conferma", "Guadagni"
+
+Delimiter auto-detection supports TAB, semicolon, and comma separators.

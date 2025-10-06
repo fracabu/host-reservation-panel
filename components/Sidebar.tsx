@@ -69,7 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, isCollapsed
   ];
 
   return (
-    <div className={`bg-gray-900 text-white transition-all duration-300 flex flex-col ${isCollapsed ? 'w-16' : 'w-64'}`}>
+    <div className={`bg-gray-900 text-white transition-all duration-300 flex flex-col h-screen ${isCollapsed ? 'w-16' : 'w-64'}`}>
       {/* Header */}
       <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between">
