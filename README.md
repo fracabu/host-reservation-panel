@@ -1,198 +1,209 @@
 # Host Reservation Panel
 
-Un'applicazione web per la gestione e analisi delle prenotazioni di host Airbnb e Booking.com, con funzionalità di estrazione dati tramite AI e previsioni di mercato.
+**AI-powered reservation management dashboard for Airbnb and Booking.com hosts**
 
-![Host Reservation Panel](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
+[English](#english) | [Italiano](#italiano)
 
-## 🚀 Funzionalità Principali
+---
 
-- **📄 Estrazione Dati Multi-formato**: Supporto per file CSV, immagini e PDF delle prenotazioni
-- **🤖 AI-Powered Processing**: Utilizzo di Google Gemini AI per l'estrazione automatica dei dati da immagini e documenti
-- **📊 Dashboard Analytics**: Visualizzazione completa delle statistiche di prenotazione con grafici interattivi
-- **📈 Previsioni e Strategie**: Assistente AI per previsioni di mercato e raccomandazioni sui prezzi (con stato persistente)
-- **💰 Analisi Finanziaria**: Riepilogo mensile con calcoli di commissioni e guadagni netti
-- **🔄 Gestione Multi-piattaforma**: Supporto nativo per Airbnb e Booking.com
-- **📋 Report PDF Professionali**: Generazione automatica di report completi con previsioni integrate
-- **💬 AI Chat Assistant**: Assistente conversazionale per insights sui dati
-- **🎛️ Interfaccia Multi-Vista**: Navigazione tra Dashboard, Analytics, Prenotazioni e Forecasting
-- **📱 Design Responsivo**: Sidebar collassabile e interfaccia ottimizzata per tutti i dispositivi
+## English
 
-## 🛠 Tecnologie
+### Overview
+
+A web application for managing and analyzing reservations from Airbnb and Booking.com, featuring AI-powered data extraction from images and PDFs, market forecasting, and comprehensive financial analytics.
+
+### Key Features
+
+- **Multi-Format Data Extraction** - Support for CSV, images, and PDF reservation files
+- **AI-Powered Processing** - Google Gemini AI for automatic data extraction from images and documents
+- **Dashboard Analytics** - Complete reservation statistics with interactive charts
+- **AI Forecasting** - Market predictions and pricing recommendations with persistent state
+- **Financial Analysis** - Monthly summary with commission calculations and net earnings
+- **Multi-Platform Support** - Native support for Airbnb and Booking.com
+- **PDF Reports** - Automatic generation of comprehensive reports with integrated forecasts
+- **AI Chat Assistant** - Conversational assistant for data insights
+- **Responsive Design** - Collapsible sidebar optimized for all devices
+
+### Tech Stack
 
 - **Frontend**: React 19 + TypeScript
 - **Build Tool**: Vite 6
 - **AI Integration**: Google Gemini AI (@google/genai)
 - **PDF Generation**: jsPDF + jsPDF-AutoTable
-- **Styling**: Tailwind CSS (classi utility)
+- **Styling**: Tailwind CSS
 
-## 📋 Prerequisiti
+### Quick Start
 
-- Node.js (versione 18 o superiore)
-- Chiave API di Google Gemini
+```bash
+# Clone repository
+git clone https://github.com/fracabu/host-reservation-panel.git
+cd host-reservation-panel
 
-## 🚀 Installazione e Avvio
+# Install dependencies
+npm install
 
-1. **Clona il repository**
-   ```bash
-   git clone <repository-url>
-   cd host-reservation-panel
-   ```
+# Configure environment
+# Create .env.local with:
+GEMINI_API_KEY=your_gemini_api_key_here
 
-2. **Installa le dipendenze**
-   ```bash
-   npm install
-   ```
+# Start application
+npm run dev
+```
 
-3. **Configura l'ambiente**
-   
-   Crea un file `.env.local` nella root del progetto:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
+Application available at `http://localhost:5173`
 
-4. **Avvia l'applicazione**
-   ```bash
-   npm run dev
-   ```
+### Supported Formats
 
-   L'applicazione sarà disponibile su `http://localhost:5173`
+| Format | Description |
+|--------|-------------|
+| CSV | Airbnb exports (Italian headers) |
+| Images | PNG, JPG, JPEG screenshots |
+| PDF | Platform booking documents |
 
-## 📁 Struttura del Progetto
+### Navigation Views
+
+- **Dashboard** - General overview and file upload
+- **Analytics** - Detailed charts and advanced metrics
+- **Reservations** - Complete list with filters and sorting
+- **Forecasting** - AI predictions and pricing strategies
+
+### Calculated Metrics
+
+| Metric | Description |
+|--------|-------------|
+| Occupancy Rate | Percentage of booked nights |
+| Revenue per Night | Average nightly earnings |
+| Total Commissions | Platform fees breakdown |
+| Net Earnings | Pre/post tax calculations (21%) |
+
+### Project Structure
 
 ```
 host-reservation-panel/
-├── components/           # Componenti React
-│   ├── Dashboard.tsx     # Dashboard principale con overview
-│   ├── Analytics.tsx     # Grafici e analytics avanzate
-│   ├── ReservationsList.tsx  # Gestione prenotazioni con filtri
-│   ├── ForecastingAssistant.tsx  # Assistente previsioni (stato persistente)
-│   ├── Sidebar.tsx       # Navigazione laterale
-│   ├── AIChat.tsx        # Chat assistant AI
-│   ├── ComprehensiveReport.tsx  # Generazione report PDF
-│   ├── ChartsForPDF.tsx  # Grafici ottimizzati per PDF
-│   ├── FileUpload.tsx    # Upload file drag-and-drop
-│   ├── MonthlySummaryTable.tsx   # Tabella riepilogo mensile
-│   └── ...
+├── components/
+│   ├── Dashboard.tsx
+│   ├── Analytics.tsx
+│   ├── ReservationsList.tsx
+│   ├── ForecastingAssistant.tsx
+│   ├── AIChat.tsx
+│   └── ComprehensiveReport.tsx
 ├── services/
-│   ├── geminiService.ts  # Servizio AI per elaborazione
-│   └── data.ts          # Servizi per elaborazione dati
-├── types.ts             # Definizioni TypeScript
-├── App.tsx              # Componente principale e gestione stato globale
-└── index.tsx            # Entry point dell'applicazione
+│   ├── geminiService.ts
+│   └── data.ts
+├── types.ts
+└── App.tsx
 ```
 
-## 💼 Come Usare
-
-### 1. Caricamento File
-- **File CSV**: Esportazioni dirette da Airbnb (formato italiano)
-- **Immagini/PDF**: Screenshot o documenti dalle piattaforme di prenotazione
-- **Multi-selezione**: Carica più file contemporaneamente per un'analisi completa
-
-### 2. Formati Supportati
-- ✅ CSV Airbnb (con intestazioni italiane)
-- ✅ Immagini (PNG, JPG, JPEG)
-- ✅ Documenti PDF
-- ✅ Screenshot delle piattaforme di prenotazione
-
-### 3. Navigazione Multi-Vista
-- **Dashboard**: Overview generale e caricamento file
-- **Analytics**: Grafici dettagliati e metriche avanzate
-- **Prenotazioni**: Lista completa con filtri e ordinamento
-- **Forecasting**: Previsioni AI e strategie di pricing
-
-### 4. Analisi Dati
-- Dashboard con statistiche in tempo reale
-- Riepilogo mensile per piattaforma
-- Calcolo automatico di commissioni e tasse (21%)
-- Gestione corretta di no-show e cancellazioni
-- Esportazione PDF dei report completi
-
-### 5. Previsioni AI (Stato Persistente)
-- Analisi del mercato locale con eventi identificati
-- Raccomandazioni sui prezzi per eventi speciali
-- Strategie di ottimizzazione dell'occupancy rate
-- Insights quantitativi su domanda e offerta
-- Generazione continua anche cambiando scheda
-
-### 6. AI Chat Assistant
-- Conversazioni naturali sui tuoi dati
-- Insights automatici e analisi personalizzate
-- Risposte basate sui dati reali delle prenotazioni
-
-## 🔧 Comandi Disponibili
+### Commands
 
 ```bash
-# Sviluppo
-npm run dev          # Avvia server di sviluppo
-
-# Produzione  
-npm run build        # Build per produzione
-npm run preview      # Preview build di produzione
+npm run dev      # Development server
+npm run build    # Production build
+npm run preview  # Preview production build
 ```
 
-## 📊 Tipologie di Dati Gestiti
+### License
 
-### Prenotazioni
-- ID prenotazione
-- Piattaforma (Airbnb/Booking.com)
-- Informazioni ospiti
-- Date arrivo/partenza
-- Stato prenotazione
-- Prezzi e commissioni
-
-### Stati Prenotazione
-- `OK`: Prenotazione confermata
-- `Cancellata`: Prenotazione cancellata
-- `Mancata presentazione`: No-show
-
-### Metriche Calcolate
-- Tasso di occupazione
-- Revenue per notte
-- Commissioni totali
-- Guadagni netti (pre/post tasse)
-
-## 🤖 Integrazione AI
-
-L'applicazione utilizza Google Gemini AI per:
-
-- **Estrazione OCR**: Lettura automatica di testo da immagini
-- **Parsing Intelligente**: Riconoscimento di strutture dati complesse
-- **Validazione**: Controllo coerenza e completezza dei dati estratti
-- **Forecasting**: Previsioni basate su dati storici e trend di mercato
-
-## 🛡 Sicurezza
-
-- Le chiavi API sono gestite tramite variabili d'ambiente
-- Nessun dato sensibile viene salvato permanentemente
-- Elaborazione locale dei file CSV per maggiore privacy
-
-## 📱 Responsive Design
-
-L'interfaccia è ottimizzata per:
-- 💻 Desktop
-- 📱 Tablet
-- 📞 Mobile
-
-## 🔗 Link Utili
-
-- **AI Studio App**: https://ai.studio/apps/drive/182CA3lBr5-9E7JY0vZ49aJt3b6XxM3Kz
-- **Google Gemini AI**: https://ai.google.dev/
-- **Documentazione Vite**: https://vitejs.dev/
-
-## 🤝 Contributi
-
-Per contribuire al progetto:
-
-1. Fork del repository
-2. Crea un branch per la tua feature
-3. Commit delle modifiche
-4. Push del branch
-5. Apri una Pull Request
-
-## 📄 Licenza
-
-Questo progetto è distribuito sotto licenza MIT. Vedi il file `LICENSE` per maggiori dettagli.
+MIT License
 
 ---
 
-**Nota**: Assicurati di avere una chiave API valida di Google Gemini per utilizzare tutte le funzionalità dell'applicazione.
+## Italiano
+
+### Panoramica
+
+Un'applicazione web per la gestione e analisi delle prenotazioni da Airbnb e Booking.com, con estrazione dati AI da immagini e PDF, previsioni di mercato e analisi finanziaria completa.
+
+### Funzionalita Principali
+
+- **Estrazione Dati Multi-Formato** - Supporto per file CSV, immagini e PDF delle prenotazioni
+- **Processing AI-Powered** - Google Gemini AI per estrazione automatica dati da immagini e documenti
+- **Dashboard Analytics** - Statistiche complete prenotazioni con grafici interattivi
+- **Previsioni AI** - Previsioni di mercato e raccomandazioni prezzi con stato persistente
+- **Analisi Finanziaria** - Riepilogo mensile con calcolo commissioni e guadagni netti
+- **Supporto Multi-Piattaforma** - Supporto nativo per Airbnb e Booking.com
+- **Report PDF** - Generazione automatica report completi con previsioni integrate
+- **AI Chat Assistant** - Assistente conversazionale per insights sui dati
+- **Design Responsivo** - Sidebar collassabile ottimizzata per tutti i dispositivi
+
+### Stack Tecnologico
+
+- **Frontend**: React 19 + TypeScript
+- **Build Tool**: Vite 6
+- **Integrazione AI**: Google Gemini AI (@google/genai)
+- **Generazione PDF**: jsPDF + jsPDF-AutoTable
+- **Styling**: Tailwind CSS
+
+### Avvio Rapido
+
+```bash
+# Clona repository
+git clone https://github.com/fracabu/host-reservation-panel.git
+cd host-reservation-panel
+
+# Installa dipendenze
+npm install
+
+# Configura ambiente
+# Crea .env.local con:
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Avvia applicazione
+npm run dev
+```
+
+Applicazione disponibile su `http://localhost:5173`
+
+### Formati Supportati
+
+| Formato | Descrizione |
+|---------|-------------|
+| CSV | Export Airbnb (intestazioni italiane) |
+| Immagini | Screenshot PNG, JPG, JPEG |
+| PDF | Documenti prenotazione piattaforme |
+
+### Viste di Navigazione
+
+- **Dashboard** - Overview generale e upload file
+- **Analytics** - Grafici dettagliati e metriche avanzate
+- **Prenotazioni** - Lista completa con filtri e ordinamento
+- **Forecasting** - Previsioni AI e strategie di pricing
+
+### Metriche Calcolate
+
+| Metrica | Descrizione |
+|---------|-------------|
+| Tasso Occupazione | Percentuale notti prenotate |
+| Revenue per Notte | Guadagno medio per notte |
+| Commissioni Totali | Breakdown fee piattaforme |
+| Guadagni Netti | Calcoli pre/post tasse (21%) |
+
+### Struttura Progetto
+
+```
+host-reservation-panel/
+├── components/
+│   ├── Dashboard.tsx
+│   ├── Analytics.tsx
+│   ├── ReservationsList.tsx
+│   ├── ForecastingAssistant.tsx
+│   ├── AIChat.tsx
+│   └── ComprehensiveReport.tsx
+├── services/
+│   ├── geminiService.ts
+│   └── data.ts
+├── types.ts
+└── App.tsx
+```
+
+### Comandi
+
+```bash
+npm run dev      # Server sviluppo
+npm run build    # Build produzione
+npm run preview  # Preview build produzione
+```
+
+### Licenza
+
+MIT License
