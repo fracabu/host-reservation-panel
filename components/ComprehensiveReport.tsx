@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Reservation, MonthlyBreakdown, Forecast } from '../types';
+import React, { useRef, useState, useMemo } from 'react';
+import { Reservation, MonthlyBreakdown, Forecast, Status } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -18,6 +18,12 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const chartsRef = useRef<HTMLDivElement>(null);
+
+  // Filtra le prenotazioni cancellate - mostra solo OK e NoShow (come la dashboard)
+  const activeReservations = useMemo(() =>
+    reservations.filter(r => r.status === Status.OK || r.status === Status.NoShow),
+    [reservations]
+  );
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
@@ -75,13 +81,13 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
       doc.setTextColor(40, 40, 40);
       doc.text('Riepilogo Generale', margin, currentY);
 
-      const totalRevenue = reservations.reduce((acc, r) => acc + r.price, 0);
-      const totalCommission = reservations.reduce((acc, r) => acc + r.commission, 0);
+      const totalRevenue = activeReservations.reduce((acc, r) => acc + r.price, 0);
+      const totalCommission = activeReservations.reduce((acc, r) => acc + r.commission, 0);
       const totalNetPreTax = totalRevenue - totalCommission;
       const totalCedolareSecca = totalNetPreTax * 0.21;
       const totalNetPostTax = totalNetPreTax - totalCedolareSecca;
 
-      const totalNights = reservations.reduce((acc, res) => {
+      const totalNights = activeReservations.reduce((acc, res) => {
         try {
           const arrival = new Date(res.arrival);
           const departure = new Date(res.departure);
@@ -103,7 +109,7 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
 
       const textPadding = 4;
       currentY += 10;
-      doc.text(`• Prenotazioni Totali: ${reservations.length}`, margin + textPadding, currentY);
+      doc.text(`• Prenotazioni Totali: ${activeReservations.length}`, margin + textPadding, currentY);
       currentY += 8;
       doc.text(`• Notti Vendute: ${totalNights}`, margin + textPadding, currentY);
       currentY += 8;
@@ -118,6 +124,90 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
       doc.text(`• Netto Finale: ${formatCurrency(totalNetPostTax)}`, margin + textPadding, currentY);
       currentY += 8;
       doc.text(`• Tariffa Media: ${formatCurrency(totalRevenue / totalNights)}/notte`, margin + textPadding, currentY);
+
+      currentY += 20;
+
+      // === SEZIONE COMMISSIONI PER PIATTAFORMA ===
+      // Verifica spazio
+      if (currentY + 90 > pageHeight - safeBottomMargin) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(40, 40, 40);
+      doc.text('Commissioni per Piattaforma', margin, currentY);
+
+      currentY += 8;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, currentY, pageWidth - margin, currentY);
+
+      // Calcola commissioni per piattaforma
+      const airbnbRes = activeReservations.filter(r => r.platform === 'Airbnb');
+      const bookingRes = activeReservations.filter(r => r.platform === 'Booking.com');
+
+      const airbnbRevenue = airbnbRes.reduce((acc, r) => acc + r.price, 0);
+      const airbnbCommission = airbnbRes.reduce((acc, r) => acc + r.commission, 0);
+      const bookingRevenue = bookingRes.reduce((acc, r) => acc + r.price, 0);
+      const bookingCommission = bookingRes.reduce((acc, r) => acc + r.commission, 0);
+
+      // Tabella commissioni
+      autoTable(doc, {
+        startY: currentY + 5,
+        head: [['Piattaforma', 'Prenotazioni', 'Lordo', 'Commissione', '% Comm.', 'Netto']],
+        body: [
+          [
+            'Airbnb',
+            airbnbRes.length.toString(),
+            formatCurrencyForPDF(airbnbRevenue),
+            formatCurrencyForPDF(airbnbCommission),
+            airbnbRevenue > 0 ? ((airbnbCommission / airbnbRevenue) * 100).toFixed(1) + '%' : '0%',
+            formatCurrencyForPDF(airbnbRevenue - airbnbCommission)
+          ],
+          [
+            'Booking.com',
+            bookingRes.length.toString(),
+            formatCurrencyForPDF(bookingRevenue),
+            formatCurrencyForPDF(bookingCommission),
+            bookingRevenue > 0 ? ((bookingCommission / bookingRevenue) * 100).toFixed(1) + '%' : '0%',
+            formatCurrencyForPDF(bookingRevenue - bookingCommission)
+          ],
+          [
+            'TOTALE',
+            activeReservations.length.toString(),
+            formatCurrencyForPDF(totalRevenue),
+            formatCurrencyForPDF(totalCommission),
+            totalRevenue > 0 ? ((totalCommission / totalRevenue) * 100).toFixed(1) + '%' : '0%',
+            formatCurrencyForPDF(totalNetPreTax)
+          ]
+        ],
+        theme: 'striped',
+        headStyles: {
+          fillColor: [79, 70, 229],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9
+        },
+        bodyStyles: { fontSize: 9 },
+        alternateRowStyles: { fillColor: [245, 245, 255] },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 25, halign: 'center' },
+          2: { cellWidth: 28, halign: 'right' },
+          3: { cellWidth: 28, halign: 'right' },
+          4: { cellWidth: 20, halign: 'center' },
+          5: { cellWidth: 28, halign: 'right' }
+        },
+        margin: { left: margin, right: margin }
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 8;
+
+      // Nota esplicativa commissioni
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      const notaCommissioni = 'Nota: Airbnb usa il modello "split-fee" (host 3.66%, ospite 14-16%). Booking.com addebita tutto all\'host (15-18%).';
+      doc.text(notaCommissioni, margin, currentY);
 
       currentY += 15;
 
@@ -185,7 +275,7 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
       doc.setDrawColor(200, 200, 200);
       doc.line(landscapeMargin, currentY, landscapeWidth - landscapeMargin, currentY);
 
-      const reservationRows = reservations.map(res => [
+      const reservationRows = activeReservations.map(res => [
         res.id.substring(0, 10) + (res.id.length > 10 ? '...' : ''),
         res.platform,
         res.guestName.substring(0, 15) + (res.guestName.length > 15 ? '...' : ''),
@@ -597,7 +687,7 @@ const ComprehensiveReport: React.FC<ComprehensiveReportProps> = ({
     <>
       {/* Hidden div per catturare i grafici */}
       <div ref={chartsRef} style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '800px' }}>
-        <ChartsForPDF reservations={reservations} />
+        <ChartsForPDF reservations={activeReservations} />
       </div>
 
       <button

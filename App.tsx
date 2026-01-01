@@ -8,6 +8,7 @@ import Calendar from './components/Calendar';
 import { Reservation, Status, Platform } from './types';
 import { GeminiService } from './services/geminiService';
 import ForecastingAssistant from './components/ForecastingAssistant';
+import * as XLSX from 'xlsx';
 
 type View = 'dashboard' | 'analytics' | 'reservations' | 'forecast' | 'calendar';
 
@@ -368,19 +369,24 @@ const App: React.FC = () => {
                     const parsedReservations: Reservation[] = rows.map(row => {
                         const values = parseCSVLine(row).map(v => v.replace(/"/g, '').trim());
 
+                        // "Guadagni" nel CSV è il netto dopo commissione Airbnb host (3% + IVA 22% = 3.66%)
                         const earningsStr = values[col.earnings]?.replace('€', '').replace(',', '.').trim() || '0';
-                        const price = parseFloat(earningsStr);
+                        const netEarnings = parseFloat(earningsStr) || 0;
+
+                        // Ricostruisci il lordo: Lordo = Netto / (1 - 3.66%) = Netto / 0.9634
+                        const grossPrice = netEarnings / 0.9634;
+                        const commission = grossPrice - netEarnings;
 
                         const guestDesc = `${values[col.adults]} adulti, ${values[col.children]} bambini, ${values[col.infants]} neonati`;
 
                         let status: Status;
-                        const airbnbStatus = values[col.status]?.toLowerCase();
-                        if (airbnbStatus === 'cancellata') {
+                        const airbnbStatus = values[col.status]?.toLowerCase() || '';
+                        if (airbnbStatus.includes('cancellata') || airbnbStatus.includes('cancel')) {
                             status = Status.Cancelled;
                         } else if (airbnbStatus.includes('mancata presentazione') || airbnbStatus.includes('no show') || airbnbStatus.includes('no-show')) {
                             status = Status.NoShow;
                         } else {
-                            status = Status.OK; // Treat 'Ospite precedente', 'Confermata', etc. as OK
+                            status = Status.OK; // Treat 'Ospite precedente', 'Confermata', 'Soggiorno in corso', etc. as OK
                         }
 
                         return {
@@ -392,8 +398,8 @@ const App: React.FC = () => {
                             departure: reformatDate(values[col.departure]),
                             bookingDate: values[col.bookingDate], // Already YYYY-MM-DD
                             status,
-                            price: isNaN(price) ? 0 : price,
-                            commission: 0, // CSV contains final payout, commission is not specified
+                            price: Math.round(grossPrice * 100) / 100, // Prezzo lordo (prima della commissione)
+                            commission: Math.round(commission * 100) / 100, // Commissione host 3.66%
                         };
                     }).filter(res => res.id); // Filter out any rows that couldn't be parsed
 
@@ -409,6 +415,152 @@ const App: React.FC = () => {
     });
   };
 
+  const parseExcelFile = (file: File): Promise<Reservation[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = event.target?.result;
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet);
+
+          console.log('📊 Excel data parsed:', jsonData.length, 'rows');
+          console.log('🔍 First row sample:', jsonData[0]);
+          console.log('📋 Available columns:', jsonData[0] ? Object.keys(jsonData[0]) : 'none');
+
+          // Helper to find column by partial match
+          const findColumn = (row: Record<string, any>, ...patterns: string[]): string | undefined => {
+            const keys = Object.keys(row);
+            for (const pattern of patterns) {
+              const found = keys.find(k => k.toLowerCase().includes(pattern.toLowerCase()));
+              if (found) return found;
+            }
+            return undefined;
+          };
+
+          // Helper function to convert DD/MM/YYYY or Excel date to YYYY-MM-DD
+          const reformatDate = (dateVal: any): string => {
+            if (!dateVal) return '';
+
+            // If it's a number (Excel serial date)
+            if (typeof dateVal === 'number') {
+              const date = XLSX.SSF.parse_date_code(dateVal);
+              if (date) {
+                return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+              }
+            }
+
+            // If it's a string like DD/MM/YYYY
+            const dateStr = String(dateVal);
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+              const day = parts[0].padStart(2, '0');
+              const month = parts[1].padStart(2, '0');
+              const year = parts[2];
+              return `${year}-${month}-${day}`;
+            }
+            return dateStr;
+          };
+
+          const parsedReservations: Reservation[] = jsonData.map((row, index) => {
+            // Detect column names dynamically
+            const idCol = findColumn(row, 'prenotazione', 'reservation', 'booking');
+            const guestCol = findColumn(row, 'ospite', 'guest', 'nome');
+            const arrivalCol = findColumn(row, 'arrivo', 'arrival', 'check-in', 'checkin');
+            const departureCol = findColumn(row, 'partenza', 'departure', 'check-out', 'checkout');
+            const bookingDateCol = findColumn(row, 'data di prenotazione', 'booking date', 'prenotata');
+            const statusCol = findColumn(row, 'stato', 'status');
+            const peopleCol = findColumn(row, 'persone', 'people', 'ospiti', 'guests');
+            const priceCol = findColumn(row, 'prezzo', 'price', 'totale', 'total');
+            // IMPORTANTE: cerca prima "Importo commissione" poi "commission" per evitare di trovare "% commissione"
+            const commissionCol = findColumn(row, 'importo commissione', 'commission amount', 'commission');
+            const nightsCol = findColumn(row, 'notti', 'nights', 'durata');
+
+            if (index === 0) {
+              console.log('🏷️ Detected columns:', {
+                id: idCol, guest: guestCol, arrival: arrivalCol, departure: departureCol,
+                bookingDate: bookingDateCol, status: statusCol, people: peopleCol,
+                price: priceCol, commission: commissionCol, nights: nightsCol
+              });
+            }
+
+            // Parse values
+            const id = idCol ? String(row[idCol] || '') : '';
+            const guestName = guestCol ? String(row[guestCol] || '') : '';
+
+            const arrival = arrivalCol ? reformatDate(row[arrivalCol]) : '';
+            const departure = departureCol ? reformatDate(row[departureCol]) : '';
+
+            // Booking date might have time component
+            let bookingDate = '';
+            if (bookingDateCol && row[bookingDateCol]) {
+              const bdVal = row[bookingDateCol];
+              if (typeof bdVal === 'number') {
+                bookingDate = reformatDate(bdVal);
+              } else {
+                const bdStr = String(bdVal).split(' ')[0]; // Remove time if present
+                bookingDate = reformatDate(bdStr);
+              }
+            }
+
+            // Parse price (handle EUR suffix and comma decimals)
+            let price = 0;
+            if (priceCol && row[priceCol]) {
+              const priceStr = String(row[priceCol]).replace('EUR', '').replace('€', '').replace(',', '.').trim();
+              price = parseFloat(priceStr) || 0;
+            }
+
+            // Parse commission
+            let commission = 0;
+            if (commissionCol && row[commissionCol]) {
+              const commStr = String(row[commissionCol]).replace('EUR', '').replace('€', '').replace(',', '.').trim();
+              commission = parseFloat(commStr) || 0;
+            }
+
+            // Parse status
+            let status: Status = Status.OK;
+            if (statusCol && row[statusCol]) {
+              const statusStr = String(row[statusCol]).toLowerCase();
+              if (statusStr.includes('no_show') || statusStr.includes('no show') || statusStr.includes('mancata')) {
+                status = Status.NoShow;
+              } else if (statusStr.includes('cancel') || statusStr.includes('annul')) {
+                status = Status.Cancelled;
+              }
+            }
+
+            // Build guest description
+            const people = peopleCol ? String(row[peopleCol] || '1') : '1';
+            const nights = nightsCol ? String(row[nightsCol] || '1') : '1';
+            const guestDesc = `${people} ${people === '1' ? 'persona' : 'persone'}, ${nights} ${nights === '1' ? 'notte' : 'notti'}`;
+
+            return {
+              id,
+              platform: 'Booking.com' as Platform,
+              guestName,
+              guestsDescription: guestDesc,
+              arrival,
+              departure,
+              bookingDate,
+              status,
+              price,
+              commission,
+            };
+          }).filter(res => res.id && res.id.trim() !== ''); // Filter out empty rows
+
+          console.log('✅ Parsed', parsedReservations.length, 'reservations from Excel');
+          resolve(parsedReservations);
+        } catch (e) {
+          console.error('❌ Excel parsing error:', e);
+          reject(e);
+        }
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
 
   const handleProcessFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -419,19 +571,16 @@ const App: React.FC = () => {
     setRetryCount(0);
 
     try {
-      // Check for unsupported Excel files
+      // Categorize files by type
+      const csvFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.csv'));
       const excelFiles = Array.from(files).filter(file => {
         const name = file.name.toLowerCase();
         return name.endsWith('.xls') || name.endsWith('.xlsx');
       });
-
-      if (excelFiles.length > 0) {
-        const fileNames = excelFiles.map(f => f.name).join(', ');
-        throw new Error(`File Excel non supportati: ${fileNames}. Per favore, esporta i dati in formato CSV e riprova. In Excel: File > Salva con nome > CSV (delimitato dal separatore di elenco).`);
-      }
-
-      const csvFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.csv'));
-      const otherFiles = Array.from(files).filter(file => !file.name.toLowerCase().endsWith('.csv'));
+      const otherFiles = Array.from(files).filter(file => {
+        const name = file.name.toLowerCase();
+        return !name.endsWith('.csv') && !name.endsWith('.xls') && !name.endsWith('.xlsx');
+      });
 
       let newlyParsedReservations: Reservation[] = [];
 
@@ -441,7 +590,13 @@ const App: React.FC = () => {
         newlyParsedReservations.push(...results.flat());
       }
 
-      // 2. Process Image/PDF files with GenAI
+      // 2. Process Excel files locally
+      if (excelFiles.length > 0) {
+        const results = await Promise.all(excelFiles.map(parseExcelFile));
+        newlyParsedReservations.push(...results.flat());
+      }
+
+      // 3. Process Image/PDF files with GenAI
       if (otherFiles.length > 0) {
         if (!process.env.API_KEY) throw new Error("API_KEY environment variable is not set.");
 
@@ -562,7 +717,7 @@ const App: React.FC = () => {
             if(e.target) e.target.value = ''; // Reset file input to allow re-uploading the same file
         }}
         multiple
-        accept="image/*,application/pdf,.csv"
+        accept="image/*,application/pdf,.csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="hidden"
       />
 

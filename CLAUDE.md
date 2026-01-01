@@ -4,159 +4,136 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Host Reservation Panel is a React/TypeScript application for managing Airbnb and Booking.com reservations. It uses AI to extract data from uploaded files (CSV, images, PDFs) and provides dashboard analytics and forecasting capabilities.
+Host Reservation Panel is a React/TypeScript application for managing Airbnb and Booking.com reservations. It uses Google Gemini AI to extract data from uploaded files (CSV, images, PDFs) and provides dashboard analytics, forecasting capabilities, and an AI chat assistant.
 
 ## Development Commands
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
+npm install       # Install dependencies
+npm run dev       # Start development server (http://localhost:5173)
+npm run build     # Build for production
+npm run preview   # Preview production build
 ```
 
-**Note**: This project has minimal build scripts. No linting, testing, or type-checking commands are configured in package.json.
+**Note**: No linting, testing, or type-checking commands are configured.
 
 ## Environment Setup
 
-The application requires a Gemini API key for AI processing:
-- Set `GEMINI_API_KEY` in `.env.local` file
-- The API key is exposed as `process.env.API_KEY` in the build via Vite config
+Create `.env.local` with your Gemini API key:
+```
+GEMINI_API_KEY=your_key_here
+```
 
-## Core Architecture
+The key is exposed as `process.env.API_KEY` via Vite config.
+
+## Architecture
 
 ### File Processing Flow
-1. **CSV Files**: Parsed locally using custom Airbnb CSV parser in `App.tsx:32-112`
-2. **Images/PDFs**: Processed via Google Gemini AI with structured JSON response schema
-3. **Data Validation**: Platform and status validation occurs in `App.tsx:167-182`
-4. **Deduplication**: Uses platform-id composite key to prevent duplicates in `App.tsx:192-197`
+1. **CSV Files**: Parsed locally in `App.tsx:151-410` - auto-detects format (Booking.com, Airbnb new/old)
+2. **Images/PDFs**: Processed via Gemini AI in `services/geminiService.ts:135-350`
+3. **Validation**: Platform and status validation in `geminiService.ts:66-133`
+4. **Deduplication**: Uses `platform-id` composite key in `App.tsx:472-476`
 
-### Data Models
-- **Reservation**: Core data type with platform, guest info, dates, pricing
-- **Status Enum**: `'OK' | 'Cancellata' | 'Mancata presentazione'`
-- **Platform**: `'Booking.com' | 'Airbnb'`
-- **MonthlyBreakdown**: Analytics aggregation by month and platform
+### CSV Format Detection (`App.tsx:187-191`)
+- **Booking.com**: Italian headers with `N° di prenotazione`, `Importo commissione`
+- **Airbnb New (2025)**: Headers include `Tipo`, `Guadagni lordi`, filters `Prenotazione` rows
+- **Airbnb Old**: Original Italian format with `Codice di conferma`, `Guadagni`
 
-### Component Architecture
-- **App.tsx**: Main state management and file processing logic
-- **Dashboard**: Primary view with stats and file upload
-- **ForecastingAssistant**: AI-powered forecasting and pricing recommendations
-- **MonthlySummaryTable**: Financial analytics breakdown
-- **FileUpload**: Drag-and-drop file processing interface
+Delimiter auto-detection: TAB > semicolon > comma
+
+### Data Models (`types.ts`)
+```typescript
+type Status = 'OK' | 'Cancellata' | 'Mancata presentazione'
+type Platform = 'Booking.com' | 'Airbnb'
+interface Reservation { id, platform, guestName, guestsDescription, arrival, departure, bookingDate, status, price, commission }
+interface MonthlyBreakdown { monthYear, booking: MonthlyStats, airbnb: MonthlyStats, total: MonthlyStats }
+interface Forecast { demandOutlook, keyEvents, quantitativeForecast, strategicRecommendations, pricingActions }
+```
 
 ### State Management
-- React hooks-based state in App.tsx
-- Key states: `reservations`, `isLoading`, `error`, `processingFileNames`, `forecast`, `forecastLoading`, `forecastError`
-- View switching between 'dashboard', 'analytics', 'reservations', and 'forecast' modes
-- **Persistent Forecasting**: Forecast state is global, allowing tab switching without interrupting AI generation
+All state lives in `App.tsx` using React hooks:
+- `reservations`, `isLoading`, `error`, `processingFileNames`
+- `forecast`, `forecastLoading`, `forecastError` (persistent across tab switches)
+- `activeView`: `'dashboard' | 'analytics' | 'reservations' | 'forecast' | 'calendar'`
 
-## AI Integration
+### Component Responsibilities
+| Component | Purpose |
+|-----------|---------|
+| `App.tsx` | Root state, file processing, view routing |
+| `Dashboard.tsx` | Stats overview, file upload |
+| `Analytics.tsx` | Charts via Recharts |
+| `ReservationsList.tsx` | Filterable/sortable reservation table |
+| `ForecastingAssistant.tsx` | AI forecasting with persistent state |
+| `AIChat.tsx` | Resizable chat sidebar, multi-model (Gemini 2.5 Flash, 1.5 Flash, 1.5 Pro) |
+| `Calendar.tsx` | Calendar view for reservations |
+| `ComprehensiveReport.tsx` | PDF generation with jsPDF |
 
-### Gemini AI Processing
-- Uses `@google/genai` package for image/PDF analysis
-- Structured response schema with TypeScript type validation
-- Prompts specifically designed for Airbnb/Booking.com data extraction
-- Base64 file encoding for multimodal input processing
+### Services
+- `services/geminiService.ts`: All Gemini AI interactions (file extraction, chat, forecasting)
+- `services/data.ts`: Data aggregation utilities
 
-### CSV Processing
-- Custom parser for Italian Airbnb exports
-- Date format conversion from DD/MM/YYYY to YYYY-MM-DD
-- Price parsing with Euro symbol and comma decimal handling
-- Guest description concatenation from separate adult/child/infant columns
-- **Status Mapping**: Correctly handles 'Mancata presentazione' (no-show) status from CSV files
+## Key Implementation Details
 
-## Development Notes
+### AI File Extraction (`geminiService.ts`)
+- Uses `gemini-2.0-flash-exp` model
+- Base64 encodes files for multimodal input
+- Structured JSON response schema with TypeScript types
+- Status normalization handles variations (no-show, cancelled, etc.)
+
+### Financial Calculations (`App.tsx:56-59`)
+- Commission tracked separately per platform
+- Cedolare Secca: 21% tax on net income (price - commission)
+- No-shows (`Mancata presentazione`) included in revenue calculations
 
 ### Path Aliases
-- `@/*` resolves to project root via Vite config
-- TypeScript configured for React JSX and ES2022 target
+`@/*` resolves to project root (configured in `vite.config.ts` and `tsconfig.json`)
 
-### Data Flow
-1. Files uploaded → `handleProcessFiles` in App.tsx
-2. CSV files processed locally, others via AI
-3. Results merged and deduplicated
-4. State updated and dashboard refreshed
-5. View automatically switches to dashboard after processing
+## Tech Stack
+- React 19 + TypeScript
+- Vite 6 (build tool)
+- Tailwind CSS v4
+- Recharts (charts)
+- jsPDF + jsPDF-AutoTable (PDF export)
+- xlsx (SheetJS) - Excel file parsing
+- @google/genai (Gemini AI)
+- react-markdown (chat rendering)
 
-### Key Features
-- Multi-file upload support (CSV, images, PDFs)
-- Real-time processing status with file names
-- Error handling with user-friendly messages
-- Platform-specific data extraction and validation
-- Monthly financial analytics and forecasting
-- **Comprehensive PDF Reports**: Professional reports with analytics, charts, and forecast integration
-- **Sidebar Navigation**: Multi-view interface (Dashboard, Analytics, Reservations, Forecasting)
-- **AI Chat Assistant**: Interactive chat for data insights and analysis
-- **Advanced Forecasting**: Event-based pricing strategies with quantitative predictions
+## Ricerca Informazioni Aggiornate
 
-## Component Structure
+Per verificare informazioni aggiornate su commissioni, policy o funzionalità delle piattaforme, usa il server Firecrawl disponibile in `C:\Users\utente\firecrawl-power-app`.
 
-The application follows a flat component structure in the `components/` directory:
-- **Dashboard.tsx**: Main dashboard with file upload and stats overview
-- **Analytics.tsx**: Advanced analytics with charts and visualizations
-- **ReservationsList.tsx**: Comprehensive reservation management with filtering and sorting
-- **ForecastingAssistant.tsx**: AI-powered forecasting and pricing recommendations (with persistent state)
-- **Sidebar.tsx**: Navigation sidebar with collapsible design
-- **AIChat.tsx**: Interactive AI assistant with multi-model support (Gemini 2.5 Flash, 1.5 Flash, 1.5 Pro)
-- **Calendar.tsx**: Calendar view for reservations
-- **ComprehensiveReport.tsx**: Professional PDF report generation with forecasts
-- **ChartsForPDF.tsx**: Chart components optimized for PDF export
-- **MonthlySummaryTable.tsx**: Monthly financial breakdown table
-- **StatsCard.tsx**: Reusable statistics display cards
-- **StatusBadge.tsx**: Status indicator component
-- **FileUpload.tsx**: Drag-and-drop file upload interface
-- **ReservationsTable.tsx**: Table component for displaying reservations
-- **PricingAssistant.tsx**: Pricing recommendations component
+### Avviare il server Firecrawl
+```bash
+cd C:\Users\utente\firecrawl-power-app && npm run server
+```
+Il server sarà disponibile su `http://localhost:3001`.
 
-All components are TypeScript React functional components using hooks for state management.
+### Cercare sui portali ufficiali
+```bash
+# Ricerca su Airbnb
+curl -X POST http://localhost:3001/api/search -H "Content-Type: application/json" \
+  -d '{"query": "commissioni host site:airbnb.it/help"}'
 
-## Services Architecture
+# Ricerca su Booking.com Partner Hub
+curl -X POST http://localhost:3001/api/search -H "Content-Type: application/json" \
+  -d '{"query": "commissione percentuale site:partner.booking.com"}'
+```
 
-- **services/geminiService.ts**: Handles all Google Gemini AI interactions for image/PDF processing and chat
-- **services/data.ts**: Data processing and aggregation utilities
+### Estrarre contenuto da pagine specifiche
+```bash
+curl -X POST http://localhost:3001/api/scrape -H "Content-Type: application/json" \
+  -d '{"url": "https://www.airbnb.it/help/article/1857", "formats": ["markdown"]}'
+```
 
-## Recent Updates (2025)
+### Fonti ufficiali da consultare
+| Piattaforma | URL | Contenuto |
+|-------------|-----|-----------|
+| Airbnb | `airbnb.it/help/article/1857` | Costi del servizio host |
+| Airbnb | `airbnb.it/help/article/2827` | Costi addebitati dall'host |
+| Booking.com | `partner.booking.com/it/aiuto/commissioni-fatture-e-tasse` | Commissioni e fatture |
 
-### Persistent Forecasting System
-- **Global State Management**: Forecast generation continues even when switching tabs
-- **Visual Indicators**: Header shows "Generando previsione..." during AI processing
-- **Auto-Resume**: Return to forecast tab to see completed results
-
-### Enhanced PDF Reports
-- **Professional Layout**: Improved margins, typography, and spacing
-- **Complete Forecast Integration**: All forecast sections included (events, pricing actions, recommendations)
-- **Financial Summary**: Comprehensive overview including net calculations and commission tracking
-- **Optimized Tables**: Fixed column widths to prevent content truncation
-
-### No-Show Status Handling
-- **CSV Parser Enhancement**: Correctly identifies and maps "Mancata presentazione" status
-- **Financial Inclusion**: No-shows are included in revenue calculations as intended
-- **Status Display**: Proper badge colors and filtering in reservation lists
-
-### Multi-View Interface
-- **Dashboard**: Overview and file processing
-- **Analytics**: Charts and advanced metrics
-- **Reservations**: Detailed reservation management
-- **Forecasting**: AI-powered pricing and demand analysis
-- **Calendar**: Calendar view for reservation visualization
-
-### AI Chat Assistant Features
-- **Multi-Model Support**: Switch between Gemini 2.5 Flash (fast, experimental), 1.5 Flash (stable, recommended), and 1.5 Pro (powerful)
-- **Resizable Sidebar**: Drag to adjust chat panel width (320px-800px)
-- **Context-Aware**: Automatically includes reservation data, monthly breakdowns, and forecast in conversations
-- **Mobile Responsive**: Collapsible on desktop, drawer on mobile
-
-### CSV Format Support
-The CSV parser intelligently detects and handles three formats:
-1. **Booking.com Format**: Italian headers with N° di prenotazione, Importo commissione
-2. **Airbnb New Format** (2025): Headers include "Tipo", "Guadagni lordi", filters "Prenotazione" rows
-3. **Airbnb Old Format**: Original Italian format with "Codice di conferma", "Guadagni"
-
-Delimiter auto-detection supports TAB, semicolon, and comma separators.
+### Documentazione commissioni
+Vedi `COMMISSIONI.md` nella root del progetto per i dettagli aggiornati su:
+- Commissioni Airbnb (3% + IVA = 3,66%)
+- Commissioni Booking.com (variabile, attualmente 18% per questa struttura)
+- Formule di calcolo usate nell'app

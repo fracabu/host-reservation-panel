@@ -52,7 +52,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onProcessFiles }) => {
         ref={inputRef}
         type="file"
         multiple
-        accept="image/*,application/pdf,.csv"
+        accept="image/*,application/pdf,.csv,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         onChange={handleChange}
         className="hidden"
         id="file-upload-input"
@@ -66,7 +66,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onProcessFiles }) => {
                 <span className="font-semibold text-indigo-600">Trascina i tuoi report</span> o clicca per caricarli
             </p>
             <p className="text-xs text-gray-500 mt-1">
-                Supporta file Immagine/PDF (Booking.com) e CSV (Airbnb)
+                Supporta CSV, Excel (XLS/XLSX), Immagini e PDF
             </p>
             <button
               type="button"

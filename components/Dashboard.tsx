@@ -228,6 +228,26 @@ const Dashboard: React.FC<DashboardProps> = ({ reservations, isLoading, error, o
                  </div>
             </div>
         </div>
+
+        {/* Info box commissioni */}
+        <div className="mt-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-indigo-800 mb-2">Come funzionano le commissioni?</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-700">
+            <div className="bg-white/60 rounded p-3">
+              <p className="font-semibold text-indigo-700 mb-1">Booking.com (Host-Only)</p>
+              <p>L'host paga tutto: <span className="font-bold">15-18%</span></p>
+              <p className="text-gray-500">L'ospite vede il prezzo finale senza sorprese.</p>
+            </div>
+            <div className="bg-white/60 rounded p-3">
+              <p className="font-semibold text-pink-700 mb-1">Airbnb (Split-Fee)</p>
+              <p>Host: <span className="font-bold">3.66%</span> | Ospite: <span className="font-bold">14-16%</span></p>
+              <p className="text-gray-500">Le piattaforme incassano ~17-18% in totale, ma su Airbnb l'ospite paga di più.</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2 italic">
+            Dettagli completi: vedi COMMISSIONI.md nel progetto
+          </p>
+        </div>
       </div>
 
 
